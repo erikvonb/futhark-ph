@@ -2,3 +2,5 @@ reduction.c
 reduction.h
 main
 
+futhark.pkg
+lib/
