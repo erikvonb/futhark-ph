@@ -54,7 +54,7 @@ let phase_0 [n] (s: state[n]): state[n] =
        with matrix = matrix'
 
 let phase_1 [n] (s: state[n]): state[n] =
-  -- TODO check if radix_sort_by_key is stable
+  -- TODO confirm that radix_sort_by_key is stable
   let (sorted_lows, sorted_js) = trace <| unzip <|
     radix_sort_by_key (.0) 64 i64.get_bit (zip s.lows (iota n))
   -- flag/mark j ∈ sorted_js if it's a pivot
@@ -114,7 +114,7 @@ let clear_positives [n] (s: state[n]): state[n] =
   in s with lows = lows'
        with classes = classes'
 
-entry initialise_state [n] (d: [n][n]i32): state[n] =
+let initialise_state [n] (d: [n][n]i32): state[n] =
   { matrix = d
   , classes = replicate n 0
   , lows = map low d
