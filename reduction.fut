@@ -9,8 +9,13 @@ type~ state [n] =
   , is_positive: [n]bool
   }
 
-let (+.) [n] (c1: [n]i32) (c2: [n]i32): [n]i32 =
-  map2 (\x y -> (x + y) % 2) c1 c2
+let dotprod [n] (xs: [n]i32) (ys: [n]i32): i32 =
+  reduce (+) 0 (map2 (*) xs ys)
+
+-- OBS: this is for row-major, but we're col-major atm. Flip order to get it
+-- right.
+let matmul [n][p][m] (xss: [n][p]i32) (yss: [p][m]i32): [n][m]i32 =
+  map (\xs -> map (dotprod xs) (transpose yss)) xss
 
 let last_occurrence [n] 't (xs: [n]t) (pred: t -> bool): i64 =
   let is = map (\i -> if pred xs[i] then i else -1) (iota n)
@@ -54,33 +59,47 @@ let phase_0 [n] (s: state[n]): state[n] =
        with matrix = matrix'
 
 let phase_1 [n] (s: state[n]): state[n] =
+  -- TODO this is a bit illegal
   -- TODO confirm that radix_sort_by_key is stable
-  let (sorted_lows, sorted_js) = trace <| unzip <|
+  let (sorted_lows, sorted_js) = unzip <|
     radix_sort_by_key (.0) 64 i64.get_bit (zip s.lows (iota n))
   -- flag/mark j ∈ sorted_js if it's a pivot
-  let flags = trace <| map2 (!=) sorted_lows (rotate (-1) sorted_lows)
+  let flags = map2 (!=) sorted_lows (rotate (-1) sorted_lows)
   -- j ∈ pivot_js is either the index of a pivot, or -1
-  let pivot_js = trace <| map (\i -> if flags[i] then sorted_js[i] else -1) (iota n)
+  let pivot_js = map (\i -> if flags[i] then sorted_js[i] else -1) (iota n)
   -- low(pivot_js) elementwise
-  let pivot_low_js = trace <| map (\i -> if i == -1 then -1 else s.lows[i]) pivot_js
+  let pivot_low_js = map (\i -> if i == -1 then -1 else s.lows[i]) pivot_js
 
-  let arglows' = trace <| scatter (copy s.arglows) pivot_low_js pivot_js
-  let classes' = trace <| scatter (copy s.classes) pivot_js (replicate n (-1))
-  let is_positive'= trace <| scatter (copy s.is_positive) pivot_low_js (replicate n true)
+  let arglows' = scatter (copy s.arglows) pivot_low_js pivot_js
+  let classes' = scatter (copy s.classes) pivot_js (replicate n (-1))
+  let is_positive'= scatter (copy s.is_positive) pivot_low_js (replicate n true)
                         
   in s with arglows = arglows'
        with classes = classes'
        with is_positive = is_positive'
 
 let phase_2 [n] (s: state[n]): state[n] =
-  let can_be_reduced = map (==0) s.classes
+  let can_be_reduced = map (==2) s.classes
+  let _ = trace s.matrix
+  let _ = trace s.lows
+  let _ = trace s.arglows
+  -- let v = trace <|
+    -- map (\j -> (map (\i -> if i == j then 1 else if s.arglows[j] == -1 then 0 else s.arglows[j]) (iota n)))
+        -- (iota n)
+  -- In col-major notation, v[j,i] = a means we add a*v[i] to v[j]
+  let v = trace <| tabulate_2d n n
+    (\j i -> if i == j then 1 else
+             if i == s.arglows[j] then 1 else 0)
 
-  let new_matrix =
-    map (\j -> if can_be_reduced[j]
-                 then let pivot = s.arglows[s.lows[j]]
-                      in s.matrix[j] +. s.matrix[pivot]
-                 else s.matrix[j])
-        (iota n)
+  -- let new_matrix =
+    -- map (\j -> if can_be_reduced[j]
+                 -- then let pivot = s.arglows[s.lows[j]]
+                      -- in s.matrix[j] +. s.matrix[pivot]
+                 -- else s.matrix[j])
+        -- (iota n)
+  -- Flip order to compensate for being col-major
+  let new_matrix = trace ( v `matmul` s.matrix
+    |> map (map (% 2)) )
 
   -- let new_lows = map low new_matrix
   let new_lows =
@@ -160,5 +179,13 @@ let d0: [][]i32 = transpose
    [0,0,0,0,0,0,1],
    [0,0,0,0,0,0,0]]
 
-let s0 = initialise_state d0
+let d1: [][]i32 = transpose
+  [[0,0,0,0,1,1,0],
+   [0,0,0,1,0,0,0],
+   [0,0,0,1,1,0,0],
+   [0,0,0,0,0,0,1],
+   [0,0,0,0,0,0,1],
+   [0,0,0,0,0,0,1],
+   [0,0,0,0,0,0,0]]
+
 

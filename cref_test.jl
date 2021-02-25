@@ -3,6 +3,27 @@ using DelimitedFiles
 using Printf
 
 
+function getlows(m)
+  lows = zeros(Int, size(m,2))
+  for j = 1:size(m,2)
+    l = findlast(!iszero, m[:,j])
+    if (isnothing(l))
+      continue
+    end
+    lows[j] = l
+  end
+  return lows
+end
+
+function isinjective(v)
+  for i = 1:(length(v) - 1)
+    if v[i] > 0 && v[i] in v[i+1:end]
+      return false
+    end
+  end
+  return true
+end
+
 function main()
 
   if length(ARGS) == 0
@@ -26,7 +47,6 @@ function main()
 
     print("\nChecking file ")
     println(filename_in)
-    println(filename_out)
 
     run(`./main $filename_in $filename_out`)
 
@@ -49,11 +69,12 @@ function main()
     # display(cref_reduced')
     # println("")
 
-    if cref_original == cref_reduced
+    if isinjective(getlows(d_original)) && cref_original == cref_reduced
       println("PASSED TEST")
       passedcount += 1
     else
       println("FAILED TEST")
+      return
     end
   end
 
