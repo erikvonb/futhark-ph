@@ -59,16 +59,38 @@ let phase_0 [n] (s: state[n]): state[n] =
        with matrix = matrix'
 
 let phase_1 [n] (s: state[n]): state[n] =
-  -- TODO this is a bit illegal
   -- TODO confirm that radix_sort_by_key is stable
   let (sorted_lows, sorted_js) = unzip <|
     radix_sort_by_key (.0) 64 i64.get_bit (zip s.lows (iota n))
-  -- flag/mark j ∈ sorted_js if it's a pivot
-  let flags = map2 (!=) sorted_lows (rotate (-1) sorted_lows)
+
+  -- If sorted_lows[j] == sorted_lows[j-1], map it to -1;
+  -- keeps only those lows that are not unique, so those that have "collided"
+  let collisions_sorted =
+    map2 (\x y -> if x == y then x else -1)
+         sorted_lows
+         (rotate (-1) sorted_lows)
+  -- Unsort them
+  let collisions = scatter (replicate n 0) sorted_js collisions_sorted
+  -- The low of a column has to be larger than this to be a pivot
+  -- Ex: [2, 3, 3, 4, 1] -> [-1, -1, 3, 3, 3]
+  let max_collisions = scan i64.max i64.lowest collisions
+
+  -- Flag/mark j ∈ sorted_js if it's a potential pivot
+  -- Ex: [2, 3, 3, 4, 1] -> [T, T, F, T, T]
+  let is_potential_pivot = map2 (!=) sorted_lows (rotate (-1) sorted_lows)
+
   -- j ∈ pivot_js is either the index of a pivot, or -1
-  let pivot_js = map (\i -> if flags[i] then sorted_js[i] else -1) (iota n)
+  -- Ex: [2, 3, 3, 4, 1] -> [T, T, F, T, F]
+  -- 2, 1st 3, 4 are pivots because they're leftmost and > max_collision.
+  -- 2nd 3 is not a pivot because it's not leftmost, so not potential pivot.
+  -- 1 is leftmost but is not > max_collision = 3, so it's not a pivot.
+  let pivot_js = 
+    map (\j -> if is_potential_pivot[j] && sorted_lows[j] > max_collisions[j]
+               then sorted_js[j]
+               else -1)
+        (iota n)
   -- low(pivot_js) elementwise
-  let pivot_low_js = map (\i -> if i == -1 then -1 else s.lows[i]) pivot_js
+  let pivot_low_js = map (\j -> if j == -1 then -1 else s.lows[j]) pivot_js
 
   let arglows' = scatter (copy s.arglows) pivot_low_js pivot_js
   let classes' = scatter (copy s.classes) pivot_js (replicate n (-1))
@@ -79,27 +101,16 @@ let phase_1 [n] (s: state[n]): state[n] =
        with is_positive = is_positive'
 
 let phase_2 [n] (s: state[n]): state[n] =
-  let can_be_reduced = map (==2) s.classes
-  let _ = trace s.matrix
-  let _ = trace s.lows
-  let _ = trace s.arglows
-  -- let v = trace <|
-    -- map (\j -> (map (\i -> if i == j then 1 else if s.arglows[j] == -1 then 0 else s.arglows[j]) (iota n)))
-        -- (iota n)
+  let can_be_reduced =
+    map (\j -> s.lows[j] != -1 && s.arglows[s.lows[j]] != j) (iota n)
+
   -- In col-major notation, v[j,i] = a means we add a*v[i] to v[j]
   let v = trace <| tabulate_2d n n
-    (\j i -> if i == j then 1 else
-             if i == s.arglows[j] then 1 else 0)
+    (\j i -> if i == j then 1
+             else let low_j = s.lows[j]
+             in if low_j > -1 && i == s.arglows[low_j] then 1 else 0)
 
-  -- let new_matrix =
-    -- map (\j -> if can_be_reduced[j]
-                 -- then let pivot = s.arglows[s.lows[j]]
-                      -- in s.matrix[j] +. s.matrix[pivot]
-                 -- else s.matrix[j])
-        -- (iota n)
-  -- Flip order to compensate for being col-major
-  let new_matrix = trace ( v `matmul` s.matrix
-    |> map (map (% 2)) )
+  let new_matrix = (v `matmul` s.matrix) |> map (map (% 2))
 
   -- let new_lows = map low new_matrix
   let new_lows =
@@ -133,6 +144,9 @@ let clear_positives [n] (s: state[n]): state[n] =
   in s with lows = lows'
        with classes = classes'
 
+let is_reduced [n] (s: state[n]): bool =
+  all (\j -> s.lows[j] == -1 || s.arglows[s.lows[j]] == j) (iota n)
+
 let initialise_state [n] (d: [n][n]i32): state[n] =
   { matrix = d
   , classes = replicate n 0
@@ -157,8 +171,9 @@ let reduce_state [n] (s_init: state[n]): state[n] =
     let s2 = s1 with is_positive = replicate n false
     let s3 = s2 |> phase_2 |> clear_positives
 
-    -- let converged = is_reduced s3
-    let converged = prev_lows == s3.lows
+    -- TODO we may need the is_reduced test, if lows don't always decrease
+    let converged = is_reduced s3
+    -- let converged = prev_lows == s4.lows
 
     in (converged, s3)
       
@@ -171,21 +186,26 @@ entry reduce_matrix [n] (matrix: [n][n]i32): ([n][n]i32, [n]i64) =
      )
 
 let d0: [][]i32 = transpose
-  [[0,0,0,1,1,0,0],
-   [0,0,0,1,0,1,0],
-   [0,0,0,0,1,1,0],
-   [0,0,0,0,0,0,1],
-   [0,0,0,0,0,0,1],
-   [0,0,0,0,0,0,1],
-   [0,0,0,0,0,0,0]]
+ [[0,0,0,0,0,0,0,0,1,0],
+  [0,0,0,0,0,0,0,1,0,0],
+  [0,0,0,0,0,0,1,0,1,1],
+  [0,0,0,0,0,0,1,1,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,1],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0]]
 
 let d1: [][]i32 = transpose
-  [[0,0,0,0,1,1,0],
-   [0,0,0,1,0,0,0],
-   [0,0,0,1,1,0,0],
-   [0,0,0,0,0,0,1],
-   [0,0,0,0,0,0,1],
-   [0,0,0,0,0,0,1],
-   [0,0,0,0,0,0,0]]
+ [[0,0,0,0,1,0,1,0],
+  [0,0,0,0,0,1,1,0],
+  [0,0,0,0,1,1,0,0],
+  [0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,1],
+  [0,0,0,0,0,0,0,1],
+  [0,0,0,0,0,0,0,1],
+  [0,0,0,0,0,0,0,0]]
 
+let s0 = initialise_state d0
 
