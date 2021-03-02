@@ -1,7 +1,8 @@
 import "lib/github.com/diku-dk/sorts/radix_sort"
+import "sparse"
 
 type~ state [n] =
-  { matrix: [n][n]i32
+  { matrix: csc_mat
   , classes: [n]i32
   , lows: [n]i64
   , lefts: [n]i64
@@ -9,29 +10,8 @@ type~ state [n] =
   , is_positive: [n]bool
   }
 
-let dotprod [n] (xs: [n]i32) (ys: [n]i32): i32 =
-  reduce (+) 0 (map2 (*) xs ys)
-
--- OBS: this is for row-major, but we're col-major atm. Flip order to get it
--- right.
-let matmul [n][p][m] (xss: [n][p]i32) (yss: [p][m]i32): [n][m]i32 =
-  map (\xs -> map (dotprod xs) (transpose yss)) xss
-
-let last_occurrence [n] 't (xs: [n]t) (pred: t -> bool): i64 =
-  let is = map (\i -> if pred xs[i] then i else -1) (iota n)
-  in reduce i64.max (-1) is
-
-let first_occurrence [n] 't (xs: [n]t) (pred: t -> bool): i64 =
-  let i = last_occurrence (reverse xs) pred
-  in if i == -1 then -1 else n - 1 - i
-
-let left [n] (d: [n][n]i32) (i: i64): i64 =
-  first_occurrence d[:,i] (==1)
-
-let low (c: []i32): i64 =
-  last_occurrence c (==1)
-
-let beta_j [n] (d: [n][n]i32) (j: i64): i64 =
+let beta_j (d: csc_mat) (j: i64): i64 =
+  let n = length d.col_offsets - 1
   let lefts = map (left d) (iota n)
   in last_occurrence lefts (==j)
 
@@ -41,9 +21,6 @@ let phase_0 [n] (s: state[n]): state[n] =
   -- If low(j) == β_j, mark j as negative
   let idxs = map (\j -> if betas[j] == s.lows[j] then j else -1) (iota n)
   let classes' = scatter (copy s.classes) idxs (replicate n (-1))
-  -- Alternatively:
-  -- let classes' =
-    -- map (\j -> if betas[j] == s.lows[j] then -1 else s.classes[j]) (iota n)
 
   -- If low(j) == β_j, mark low(j) as positive and clear it
   let idxs' = map (\j -> if betas[j] == s.lows[j] then s.lows[j] else -1) (iota n)
@@ -51,12 +28,12 @@ let phase_0 [n] (s: state[n]): state[n] =
   let lows' = scatter (copy s.lows) idxs' (replicate n (-1))
   let arglows' = scatter (copy s.arglows) idxs' (iota n)
   -- the actual clearing is unnecessary for the algorithm to work
-  let matrix' = scatter (copy s.matrix) idxs' (replicate n (replicate n 0))
+  -- let matrix' = scatter (copy s.matrix) idxs' (replicate n (replicate n 0))
 
   in s with classes = classes''
        with lows = lows'
        with arglows = arglows'
-       with matrix = matrix'
+       -- with matrix = matrix'
 
 let phase_1 [n] (s: state[n]): state[n] =
   -- TODO confirm that radix_sort_by_key is stable
@@ -104,17 +81,17 @@ let phase_2 [n] (s: state[n]): state[n] =
   let can_be_reduced =
     map (\j -> s.lows[j] != -1 && s.arglows[s.lows[j]] != j) (iota n)
 
-  -- In col-major notation, v[j,i] = a means we add a*v[i] to v[j]
-  let v = trace <| tabulate_2d n n
-    (\j i -> if i == j then 1
-             else let low_j = s.lows[j]
-             in if low_j > -1 && i == s.arglows[low_j] then 1 else 0)
+  -- let v = trace <| tabulate_2d n n
+    -- (\j i -> if i == j then 1
+             -- else let low_j = s.lows[j]
+             -- in if low_j > -1 && i == s.arglows[low_j] then 1 else 0)
 
-  let new_matrix = (v `matmul` s.matrix) |> map (map (% 2))
+  -- let new_matrix = (v `matmul` s.matrix) |> map (map (% 2))
+  let new_matrix = reduce_step s.matrix s.lows s.arglows
 
   -- let new_lows = map low new_matrix
   let new_lows =
-    map (\j -> if can_be_reduced[j] then low new_matrix[j] else s.lows[j])
+    map (\j -> if can_be_reduced[j] then low new_matrix j else s.lows[j])
         (iota n)
 
   -- Identify new pivots and clear
@@ -147,14 +124,14 @@ let clear_positives [n] (s: state[n]): state[n] =
 let is_reduced [n] (s: state[n]): bool =
   all (\j -> s.lows[j] == -1 || s.arglows[s.lows[j]] == j) (iota n)
 
-let initialise_state [n] (d: [n][n]i32): state[n] =
-  { matrix = d
-  , classes = replicate n 0
-  , lows = map low d
-  , lefts = map (left d) (iota n)
-  , arglows = replicate n (-1)
-  , is_positive = replicate n false
-  }
+-- let initialise_state [n] (d: csc_mat): state[n] =
+  -- { matrix = d
+  -- , classes = replicate n 0
+  -- , lows = map (low d) (iota n)
+  -- , lefts = map (left d) (iota n)
+  -- , arglows = replicate n (-1)
+  -- , is_positive = replicate n false
+  -- }
 
 let reduce_state [n] (s_init: state[n]): state[n] =
   let s0 = s_init
@@ -179,11 +156,27 @@ let reduce_state [n] (s_init: state[n]): state[n] =
       
   in final_state
 
-entry reduce_matrix [n] (matrix: [n][n]i32): ([n][n]i32, [n]i64) =
-  let s = initialise_state matrix |> reduce_state
-  in ( s.matrix
-     , s.lows
-     )
+-- let reduce_matrix [n] (matrix: coo2_mat[n]): ([]i64, []i32, []i64) =
+  -- let _ = trace matrix
+  -- -- let s = initialise_state matrix |> reduce_state
+  -- -- in ( s.matrix
+     -- -- , s.lows
+     -- -- )
+  -- in ([], [], [])
+
+entry reduce_matrix (col_offsets: []i64) (row_idxs: []i32): ([]i64, []i32, []i64) =
+  let d = { col_offsets = col_offsets, row_idxs = row_idxs }
+  let n = length col_offsets - 1
+  let s =
+    { matrix = d
+    , classes = replicate n 0
+    , lows = map (low d) (iota n)
+    , lefts = map (left d) (iota n)
+    , arglows = replicate n (-1)
+    , is_positive = replicate n false
+    } 
+    |> reduce_state
+  in (s.matrix.col_offsets, s.matrix.row_idxs, s.lows)
 
 let d0: [][]i32 = transpose
  [[0,0,0,0,0,0,0,0,1,0],
@@ -207,5 +200,6 @@ let d1: [][]i32 = transpose
   [0,0,0,0,0,0,0,1],
   [0,0,0,0,0,0,0,0]]
 
-let s0 = initialise_state d0
+let d1_co: []i64 = [0, 0, 0, 0, 0, 2, 4, 6, 9]
+let d1_ri: []i32 = [0, 2,  1, 2,  0, 1,  4, 5, 6]
 

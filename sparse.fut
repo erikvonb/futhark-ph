@@ -40,6 +40,17 @@ let left (d: csc_mat) (i: i64): i64 =
   let flag j = any (== i32.i64 i) (get_csc_row d j)
   in first_occurrence (map flag (iota n)) id
 
+-- let clear_column (d: csc_mat) (j: i64): csc_mat =
+  -- let col_start = d.col_offsets[j]
+  -- let col_end = d.col_offsets[j + 1]
+  -- let col_length = col_end - col_start
+
+  -- let row_idxs' = d.row_idxs[0:col_start - 1] ++ d.row_idxs[col_end:]
+  -- let col_offsets' = d.col_offsets[0:j + 1]
+                     -- ++ map (\x -> x - col_length) d.col_offsets[j + 1:]
+
+  -- in { col_offsets = col_offsets', row_idxs = row_idxs' }
+
 let coo3_to_csc [n] (d: coo3_mat[n]) (n_cols: i64): csc_mat =
   let d' = filter (\(_,_,v) -> v != 0) d
   let col_idxs = (unzip3 d').0
