@@ -7,7 +7,12 @@
 void print_matrix(int32_t* matrix, int n) {
   for (size_t j = 0; j < n; j++) {
     for (size_t i = 0; i < n; i++) {
-      printf("%d ", matrix[i * n + j]);
+      int32_t v = matrix[i * n + j];
+      if (v == 0) {
+        printf(". ");
+      } else {
+        printf("%d ", v);
+      }
     }
     printf("\n");
   }
