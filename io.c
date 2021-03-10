@@ -36,9 +36,10 @@ void read_sparse_matrix(
 
   for (size_t i = 0; i < nnz; i++) {
     int r, c;
-    int num_success = fscanf(fp, "%d,%d\n", &r, &c);
+    int num_success = fscanf(fp, "%d %d\n", &r, &c);
     if (num_success != 2) {
       printf("Failed to read data at row %ld\n", i);
+      exit(EXIT_FAILURE);
     }
     rows[i] = r;
     cols[i] = c;

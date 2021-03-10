@@ -5,7 +5,7 @@
 
 
 int32_t* sparse_to_dense(int32_t* col_idxs, int32_t* row_idxs, int nnz, int n) {
-  int32_t* matrix = calloc(n * n, sizeof(int33_t));
+  int32_t* matrix = calloc(n * n, sizeof(int32_t));
   for (size_t k = 0; k < nnz; k++) {
     int j = col_idxs[k];
     int i = row_idxs[k];
