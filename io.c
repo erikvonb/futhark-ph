@@ -21,23 +21,34 @@ int count_lines(char* filename) {
 }
 
 void read_sparse_matrix(
-    int* out_rows, int* out_cols, int n, char* filename) {
+    int32_t** out_rows, int32_t** out_cols, int32_t* out_nnz, int64_t* out_n,
+    char* filename) {
+  int nnz = count_lines(filename);
+  
+  int n = 0;
+  int32_t* rows = malloc(nnz * sizeof(int));
+  int32_t* cols = malloc(nnz * sizeof(int));
 
   FILE* fp = fopen(filename, "r");
   if (!fp) {
     printf("Filename for dataset invalid\n");
   }
 
-  for (size_t i = 0; i < n; i++) {
+  for (size_t i = 0; i < nnz; i++) {
     int r, c;
     int num_success = fscanf(fp, "%d,%d\n", &r, &c);
     if (num_success != 2) {
       printf("Failed to read data at row %ld\n", i);
     }
-    out_rows[i] = r;
-    out_cols[i] = c;
+    rows[i] = r;
+    cols[i] = c;
+    n = c + 1 > n ? c + 1 : n;
   }
 
+  *out_n = n;
+  *out_nnz = nnz;
+  *out_rows = rows;
+  *out_cols = cols;
   fclose(fp);
 }
 

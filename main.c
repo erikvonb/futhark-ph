@@ -4,9 +4,20 @@
 #include <stdio.h>
 
 
+int32_t* sparse_to_dense(int32_t* col_idxs, int32_t* row_idxs, int nnz, int n) {
+  int32_t* matrix = calloc(n * n, sizeof(int33_t));
+  for (size_t k = 0; k < nnz; k++) {
+    int j = col_idxs[k];
+    int i = row_idxs[k];
+    matrix[i * n + j] = 1;
+  }
+
+  return matrix;
+}
+
 void print_matrix(int32_t* matrix, int n) {
-  for (size_t j = 0; j < n; j++) {
-    for (size_t i = 0; i < n; i++) {
+  for (size_t i = 0; i < n; i++) {
+    for (size_t j = 0; j < n; j++) {
       int32_t v = matrix[i * n + j];
       if (v == 0) {
         printf(". ");
@@ -25,7 +36,17 @@ void print_array(int64_t* array, int n) {
   printf("\n");
 }
 
-void reduce(int32_t* matrix, int64_t n, int32_t* out_matrix, int64_t* out_lows) {
+void print_array_32(int32_t* array, int n) {
+  for (size_t i = 0; i < n; i++) {
+    printf("%d ", array[i]);
+  }
+  printf("\n");
+}
+
+void reduce(
+    int32_t* col_idxs, int32_t* row_idxs, int64_t n, int nnz,
+    int32_t** out_col_idxs, int32_t** out_row_idxs, int64_t** out_lows,
+    int64_t* out_nnz) {
 
   struct futhark_context_config* config = futhark_context_config_new();
   struct futhark_context* context = futhark_context_new(config); 
@@ -37,30 +58,56 @@ void reduce(int32_t* matrix, int64_t n, int32_t* out_matrix, int64_t* out_lows) 
     exit(EXIT_FAILURE);
   }
 
-  printf("Building matrix on host...\n");
-  struct futhark_i32_2d* fut_matrix =
-    futhark_new_i32_2d(context, matrix, n, n);
+  printf("Copying data to device...\n");
+  struct futhark_i32_1d* fut_col_idxs =
+    futhark_new_i32_1d(context, col_idxs, nnz);
+  struct futhark_i32_1d* fut_row_idxs =
+    futhark_new_i32_1d(context, row_idxs, nnz);
 
   printf("Reducing...\n");
-  struct futhark_i32_2d* fut_reduced_matrix = NULL;
+  struct futhark_i32_1d* fut_reduced_col_idxs = NULL;
+  struct futhark_i32_1d* fut_reduced_row_idxs = NULL;
   struct futhark_i64_1d* fut_reduced_lows = NULL;
-  futhark_entry_reduce_matrix(context, &fut_reduced_matrix, &fut_reduced_lows, fut_matrix);
+  futhark_entry_reduce_matrix(
+      context,
+      &fut_reduced_col_idxs,
+      &fut_reduced_row_idxs,
+      &fut_reduced_lows,
+      fut_col_idxs,
+      fut_row_idxs,
+      n);
+
+  printf("Done reducing\n");
+  futhark_context_sync(context);
+
+  const int64_t* reduced_nnz_dims =
+    futhark_shape_i32_1d(context, fut_reduced_col_idxs);
+
+  int32_t* reduced_col_idxs = malloc(reduced_nnz_dims[0] * sizeof(int32_t));
+  int32_t* reduced_row_idxs = malloc(reduced_nnz_dims[0] * sizeof(int32_t));
+  int64_t* reduced_lows = malloc(n * sizeof(int64_t));
 
   printf("Copying to host...\n");
-  futhark_values_i32_2d(context, fut_reduced_matrix, out_matrix);
-  futhark_values_i64_1d(context, fut_reduced_lows, out_lows);
-
-  futhark_context_sync(context);
+  futhark_values_i32_1d(context, fut_reduced_col_idxs, reduced_col_idxs);
+  futhark_values_i32_1d(context, fut_reduced_row_idxs, reduced_row_idxs);
+  futhark_values_i64_1d(context, fut_reduced_lows, reduced_lows);
 
   printf("Done\n");
   printf("Freeing futhark data\n");
-  futhark_free_i32_2d(context, fut_matrix);
+  futhark_free_i32_1d(context, fut_col_idxs);
+  futhark_free_i32_1d(context, fut_row_idxs);
+  futhark_free_i32_1d(context, fut_reduced_col_idxs);
+  futhark_free_i32_1d(context, fut_reduced_row_idxs);
   futhark_free_i64_1d(context, fut_reduced_lows);
-  futhark_free_i32_2d(context, fut_reduced_matrix);
 
   printf("Freeing futhark context and config\n");
   futhark_context_free(context);
   futhark_context_config_free(config);
+
+  *out_nnz = reduced_nnz_dims[0];
+  *out_col_idxs = reduced_col_idxs;
+  *out_row_idxs = reduced_row_idxs;
+  *out_lows = reduced_lows;
 }
 
 int main(int argc, char *argv[]) {
@@ -72,31 +119,41 @@ int main(int argc, char *argv[]) {
   char* input_file = argv[1];
   char* output_file = argv[2];
 
-  int n;
-  int32_t* matrix = malloc(n * n * sizeof(int32_t));
-  read_dense_matrix(input_file, matrix, &n);
-
-  /*int* sparse_rows = malloc(n * sizeof(int));*/
-  /*int* sparse_cols = malloc(n * sizeof(int));*/
-  /*read_sparse_matrix(sparse_rows, sparse_cols, n,*/
-      /*"../datasets/sparse/klein_bottle_pointcloud_new_400.txt");*/
-      /*"../datasets/sparse/test.txt");*/
+  int64_t n;
+  int32_t nnz;
+  int32_t* row_idxs;
+  int32_t* col_idxs;
+  read_sparse_matrix(&row_idxs, &col_idxs, &nnz, &n, input_file);
 
   printf("Initial matrix is:\n");
-  print_matrix(matrix, n);
+  print_matrix(sparse_to_dense(col_idxs, row_idxs, nnz, n), n);
 
-  int32_t* reduced_matrix = calloc(n * n, sizeof(int32_t));
-  int64_t* reduced_lows = calloc(n, sizeof(int64_t));
-  reduce(matrix, n, reduced_matrix, reduced_lows);
+  int64_t reduced_nnz;
+  int32_t* reduced_col_idxs;
+  int32_t* reduced_row_idxs;
+  int64_t* reduced_lows;
+
+  reduce(col_idxs, row_idxs, n, nnz, &reduced_col_idxs, &reduced_row_idxs,
+      &reduced_lows, &reduced_nnz);
+
+  free(col_idxs);
+  free(row_idxs);
+
+  int32_t* reduced_dense_matrix =
+    sparse_to_dense(reduced_col_idxs, reduced_row_idxs, reduced_nnz, n);
 
   printf("Reduced matrix is:\n");
-  print_matrix(reduced_matrix, n);
+  print_matrix(reduced_dense_matrix, n);
   printf("Writing matrix to file\n");
-  write_dense_matrix(reduced_matrix, n, output_file);
-  free(reduced_matrix);
+  write_dense_matrix(reduced_dense_matrix, n, output_file);
+  
+  free(reduced_dense_matrix);
 
   printf("Reduced lows are:\n");
   print_array(reduced_lows, n);
+
+  free(reduced_col_idxs);
+  free(reduced_row_idxs);
   free(reduced_lows);
 }
 

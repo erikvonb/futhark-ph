@@ -81,22 +81,19 @@ let phase_2 [n] (s: state[n]): state[n] =
   let can_be_reduced =
     map (\j -> s.lows[j] != -1 && s.arglows[s.lows[j]] != j) (iota n)
 
-  -- let v = trace <| tabulate_2d n n
-    -- (\j i -> if i == j then 1
-             -- else let low_j = s.lows[j]
-             -- in if low_j > -1 && i == s.arglows[low_j] then 1 else 0)
-
-  -- let new_matrix = (v `matmul` s.matrix) |> map (map (% 2))
   let new_matrix = reduce_step s.matrix s.lows s.arglows
 
-  -- let new_lows = map low new_matrix
   let new_lows =
-    map (\j -> if can_be_reduced[j] then low new_matrix j else s.lows[j])
-        (iota n)
+    -- map (\j -> if can_be_reduced[j] then low new_matrix j else s.lows[j])
+        -- (iota n)
+    map (low new_matrix) (iota n)
 
   -- Identify new pivots and clear
   let is_new_pivot =
-    map (\j -> can_be_reduced[j] && j == s.lefts[new_lows[j]]) (iota n)
+    map (\j -> can_be_reduced[j]
+               && new_lows[j] > -1
+               && j == s.lefts[new_lows[j]])
+        (iota n)
   let new_classes =
     map (\j -> if is_new_pivot[j] then -1 else s.classes[j]) (iota n)
 
@@ -124,21 +121,11 @@ let clear_positives [n] (s: state[n]): state[n] =
 let is_reduced [n] (s: state[n]): bool =
   all (\j -> s.lows[j] == -1 || s.arglows[s.lows[j]] == j) (iota n)
 
--- let initialise_state [n] (d: csc_mat): state[n] =
-  -- { matrix = d
-  -- , classes = replicate n 0
-  -- , lows = map (low d) (iota n)
-  -- , lefts = map (left d) (iota n)
-  -- , arglows = replicate n (-1)
-  -- , is_positive = replicate n false
-  -- }
-
 let reduce_state [n] (s_init: state[n]): state[n] =
   let s0 = s_init
   let s1 = phase_0 s0
 
-  let final_state = (.1) <|
-      loop (converged, s) = (false, s1) while !converged do
+  let (final_state, _) = loop (s, converged) = (s1, false) while !converged do
 
     let prev_lows = s.lows
 
@@ -152,21 +139,12 @@ let reduce_state [n] (s_init: state[n]): state[n] =
     let converged = is_reduced s3
     -- let converged = prev_lows == s4.lows
 
-    in (converged, s3)
+    in (s3, converged)
       
   in final_state
 
--- let reduce_matrix [n] (matrix: coo2_mat[n]): ([]i64, []i32, []i64) =
-  -- let _ = trace matrix
-  -- -- let s = initialise_state matrix |> reduce_state
-  -- -- in ( s.matrix
-     -- -- , s.lows
-     -- -- )
-  -- in ([], [], [])
-
-entry reduce_matrix (col_offsets: []i64) (row_idxs: []i32): ([]i64, []i32, []i64) =
-  let d = { col_offsets = col_offsets, row_idxs = row_idxs }
-  let n = length col_offsets - 1
+entry reduce_matrix (col_idxs: []i32) (row_idxs: []i32) (n: i64): ([]i32, []i32, []i64) =
+  let d = coo2_to_csc (zip col_idxs row_idxs |> sort_coo2) n
   let s =
     { matrix = d
     , classes = replicate n 0
@@ -176,7 +154,11 @@ entry reduce_matrix (col_offsets: []i64) (row_idxs: []i32): ([]i64, []i32, []i64
     , is_positive = replicate n false
     } 
     |> reduce_state
-  in (s.matrix.col_offsets, s.matrix.row_idxs, s.lows)
+  let (col_idxs', row_idxs') = s.matrix |> csc_to_coo2 |> unzip
+  in (col_idxs', row_idxs', s.lows)
+  -- in (s.matrix.col_offsets, s.matrix.row_idxs, s.lows)
+  -- in ([11], [22, 22], replicate 7 33)
+  -- in ([11], [22, 22], copy s.lows)
 
 let d0: [][]i32 = transpose
  [[0,0,0,0,0,0,0,0,1,0],
@@ -202,4 +184,16 @@ let d1: [][]i32 = transpose
 
 let d1_co: []i64 = [0, 0, 0, 0, 0, 2, 4, 6, 9]
 let d1_ri: []i32 = [0, 2,  1, 2,  0, 1,  4, 5, 6]
+
+-- ../datasets/sparse/test.txt
+let d2_cs: []i32 = [3, 4, 3, 5, 4, 5, 6, 6, 6]
+let d2_rs: []i32 = [0, 0, 1, 1, 2, 2, 3, 4, 5]
+let d2_n: i64 = 7
+-- . . . 1 1 . .
+-- . . . 1 . 1 .
+-- . . . . 1 1 .
+-- . . . . . . 1
+-- . . . . . . 1
+-- . . . . . . 1
+-- . . . . . . .
 

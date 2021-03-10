@@ -10,9 +10,6 @@ type~ csc_mat =
 -- (j, i); column index, row index
 type coo2_mat [n] = [n](i32, i32)
 
--- (j, i, v); column index, row index, value
-type coo3_mat [n] = [n](i32, i32, i32)
-
 let get_csc_row (d: csc_mat) (j: i64): []i32 =
   d.row_idxs[d.col_offsets[j] : d.col_offsets[j+1]]
 
@@ -51,10 +48,9 @@ let left (d: csc_mat) (i: i64): i64 =
 
   -- in { col_offsets = col_offsets', row_idxs = row_idxs' }
 
-let coo3_to_csc [n] (d: coo3_mat[n]) (n_cols: i64): csc_mat =
-  let d' = filter (\(_,_,v) -> v != 0) d
-  let col_idxs = (unzip3 d').0
-  let row_idxs = (unzip3 d').1
+let coo2_to_csc [n] (d: coo2_mat[n]) (n_cols: i64): csc_mat =
+  let col_idxs = (unzip2 d).0
+  let row_idxs = (unzip2 d).1
   let segments = map2 (!=) (rotate (-1) col_idxs) col_idxs
 
   let (elems_per_col, col_idxs) =
@@ -70,6 +66,12 @@ let coo3_to_csc [n] (d: coo3_mat[n]) (n_cols: i64): csc_mat =
     |> scan (+) 0
 
   in { col_offsets = col_offsets, row_idxs = row_idxs }
+
+let csc_to_coo2 (d: csc_mat): [](i32, i32) =
+  let n = length d.col_offsets - 1
+  in expand (\j -> d.col_offsets[j + 1] - d.col_offsets[j])
+            (\j k -> ( i32.i64 j, d.row_idxs[d.col_offsets[j] + k]))
+            (iota n)
 
 let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64): csc_mat =
   -- Define functions for expansion
@@ -109,7 +111,9 @@ let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64): csc_mat =
       (zip3 sorted_cols sorted_rows <| map (const 1) sorted_cols)
 
   -- Convert COO3 back into CSC
-  in coo3_to_csc coo3 (length d.col_offsets - 1)
+  let coo3' = filter (\(_,_,v) -> v != 0) coo3
+  let coo2' = zip (unzip3 coo3').0 (unzip3 coo3').1
+  in coo2_to_csc coo2' (length d.col_offsets - 1)
 
 -- 0 0 1 0
 -- 0 0 1 1
