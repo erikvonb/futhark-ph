@@ -40,18 +40,6 @@ let phase_1 [n] (s: state[n]): state[n] =
   let (sorted_lows, sorted_js) = unzip <|
     radix_sort_by_key (.0) 64 i64.get_bit (zip s.lows (iota n))
 
-  -- If sorted_lows[j] == sorted_lows[j-1], map it to -1;
-  -- keeps only those lows that are not unique, so those that have "collided"
-  let collisions_sorted =
-    map2 (\x y -> if x == y then x else -1)
-         sorted_lows
-         (rotate (-1) sorted_lows)
-  -- Unsort them
-  let collisions = scatter (replicate n 0) sorted_js collisions_sorted
-  -- The low of a column has to be larger than this to be a pivot
-  -- Ex: [2, 3, 3, 4, 1] -> [-1, -1, 3, 3, 3]
-  let max_collisions = scan i64.max i64.lowest collisions
-
   -- Flag/mark j ∈ sorted_js if it's a potential pivot
   -- Ex: [2, 3, 3, 4, 1] -> [T, T, F, T, T]
   let is_potential_pivot = map2 (!=) sorted_lows (rotate (-1) sorted_lows)
@@ -62,10 +50,11 @@ let phase_1 [n] (s: state[n]): state[n] =
   -- 2nd 3 is not a pivot because it's not leftmost, so not potential pivot.
   -- 1 is leftmost but is not > max_collision = 3, so it's not a pivot.
   let pivot_js = 
-    map (\j -> if is_potential_pivot[j] && sorted_lows[j] > max_collisions[j]
+    map (\j -> if is_potential_pivot[j]
                then sorted_js[j]
                else -1)
         (iota n)
+
   -- low(pivot_js) elementwise
   let pivot_low_js = map (\j -> if j == -1 then -1 else s.lows[j]) pivot_js
 
