@@ -80,7 +80,7 @@ void write_dense_matrix(int32_t* matrix, int n, char* filename) {
 
   for (size_t i = 0; i < n; i++) {
     for (size_t j = 0; j < n; j++) {
-      int v = matrix[j * n + i];
+      int v = matrix[i * n + j];
       char c = v == 0 ? '0' : '1';
       fputc(c, fp);
 
