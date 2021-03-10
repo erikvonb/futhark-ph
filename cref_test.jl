@@ -2,6 +2,20 @@ using Nemo
 using DelimitedFiles
 using Printf
 
+
+function readsparse(filename)
+  coords = readdlm(filename, ' ', Int, '\n')
+  n = maximum(coords[:,2]) + 1
+  matrix = zeros(Int, n, n)
+
+  for k in 1 : size(coords, 1)
+    i = coords[k, 1] + 1
+    j = coords[k, 2] + 1
+    matrix[i, j] = 1
+  end
+  return matrix
+end
+
 function columnlow(c)
   for i in size(c, 1) : -1 : 1
     if (c[i] != 0)
@@ -79,7 +93,8 @@ function main()
     run(`./main $filename_in $filename_out`)
 
     println("reading original")
-    d_original´ = readdlm(filename_in,  ' ', Int, '\n')
+    # d_original´ = readdlm(filename_in,  ' ', Int, '\n')
+    d_original´ = readsparse(filename_in)
     println("reading reduced")
     d_reduced´ = readdlm(filename_out, ' ', Int, '\n')
     n = size(d_original´, 1)
