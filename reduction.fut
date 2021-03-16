@@ -145,9 +145,6 @@ entry reduce_matrix (col_idxs: []i32) (row_idxs: []i32) (n: i64): ([]i32, []i32,
     |> reduce_state
   let (col_idxs', row_idxs') = s.matrix |> csc_to_coo2 |> unzip
   in (col_idxs', row_idxs', s.lows)
-  -- in (s.matrix.col_offsets, s.matrix.row_idxs, s.lows)
-  -- in ([11], [22, 22], replicate 7 33)
-  -- in ([11], [22, 22], copy s.lows)
 
 let d0: [][]i32 = transpose
  [[0,0,0,0,0,0,0,0,1,0],

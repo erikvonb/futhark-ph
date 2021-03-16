@@ -93,3 +93,13 @@ void write_dense_matrix(int32_t* matrix, int n, char* filename) {
   fclose(fp);
 }
 
+void write_array(int64_t* array, int n, char* filename) {
+  FILE* fp = fopen(filename, "w");
+
+  for (size_t i = 0; i < n; i++) {
+    fprintf(fp, "%ld ", array[i]);
+  }
+  fclose(fp);
+}
+
+

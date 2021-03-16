@@ -1,5 +1,5 @@
 all: reduction.h main.c
-	gcc main.c reduction.c -o main -O2 -lOpenCL -lm
+	gcc main.c reduction.c -o main -O2 -lOpenCL -lm -pthread
 
 reduction.h: reduction.fut
 	#futhark cuda --library reduction.fut

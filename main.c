@@ -2,6 +2,7 @@
 #include "io.c"
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 
 
 int32_t* sparse_to_dense(int32_t* col_idxs, int32_t* row_idxs, int nnz, int n) {
@@ -45,6 +46,7 @@ void print_array_32(int32_t* array, int n) {
 
 void reduce(
     int32_t* col_idxs, int32_t* row_idxs, int64_t n, int nnz,
+    bool should_write_matrix,
     int32_t** out_col_idxs, int32_t** out_row_idxs, int64_t** out_lows,
     int64_t* out_nnz) {
 
@@ -88,9 +90,13 @@ void reduce(
   int64_t* reduced_lows = malloc(n * sizeof(int64_t));
 
   printf("Copying to host...\n");
-  futhark_values_i32_1d(context, fut_reduced_col_idxs, reduced_col_idxs);
-  futhark_values_i32_1d(context, fut_reduced_row_idxs, reduced_row_idxs);
-  futhark_values_i64_1d(context, fut_reduced_lows, reduced_lows);
+  if (should_write_matrix) {
+    futhark_values_i32_1d(context, fut_reduced_col_idxs, reduced_col_idxs);
+    futhark_values_i32_1d(context, fut_reduced_row_idxs, reduced_row_idxs);
+
+  } else {
+    futhark_values_i64_1d(context, fut_reduced_lows, reduced_lows);
+  }
 
   printf("Done\n");
   printf("Freeing futhark data\n");
@@ -111,13 +117,24 @@ void reduce(
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 3) {
-    printf("Wrong number of input arguments.\n");
-    return  EXIT_FAILURE;
-  }
+  char* input_file;
+  char* output_file;
+  bool should_write_matrix = false;
 
-  char* input_file = argv[1];
-  char* output_file = argv[2];
+  char c;
+  while( (c = getopt(argc, argv, "i:o:m")) != -1 ) {
+    switch(c) {
+      case 'i':
+        input_file = optarg;
+        break;
+      case 'o':
+        output_file = optarg;
+        break;
+      case 'm':
+        should_write_matrix = true;
+        break;
+    }
+  }
 
   int64_t n;
   int32_t nnz;
@@ -125,35 +142,39 @@ int main(int argc, char *argv[]) {
   int32_t* col_idxs;
   read_sparse_matrix(&row_idxs, &col_idxs, &nnz, &n, input_file);
 
-  printf("Initial matrix is:\n");
-  print_matrix(sparse_to_dense(col_idxs, row_idxs, nnz, n), n);
+  /*printf("Initial matrix is:\n");*/
+  /*print_matrix(sparse_to_dense(col_idxs, row_idxs, nnz, n), n);*/
 
   int64_t reduced_nnz;
   int32_t* reduced_col_idxs;
   int32_t* reduced_row_idxs;
   int64_t* reduced_lows;
 
-  reduce(col_idxs, row_idxs, n, nnz, &reduced_col_idxs, &reduced_row_idxs,
-      &reduced_lows, &reduced_nnz);
+  reduce(col_idxs, row_idxs, n, nnz, should_write_matrix,
+      &reduced_col_idxs, &reduced_row_idxs, &reduced_lows, &reduced_nnz);
 
   free(col_idxs);
   free(row_idxs);
 
-  int32_t* reduced_dense_matrix =
-    sparse_to_dense(reduced_col_idxs, reduced_row_idxs, reduced_nnz, n);
+  if (should_write_matrix) {
+    int32_t* reduced_dense_matrix =
+      sparse_to_dense(reduced_col_idxs, reduced_row_idxs, reduced_nnz, n);
 
-  printf("Reduced matrix is:\n");
-  print_matrix(reduced_dense_matrix, n);
-  printf("Writing matrix to file\n");
-  write_dense_matrix(reduced_dense_matrix, n, output_file);
-  
-  free(reduced_dense_matrix);
+    /*printf("Reduced matrix is:\n");*/
+    /*print_matrix(reduced_dense_matrix, n);*/
+    printf("Writing matrix to file\n");
+    write_dense_matrix(reduced_dense_matrix, n, output_file);
+    
+    free(reduced_dense_matrix);
+    free(reduced_col_idxs);
+    free(reduced_row_idxs);
 
-  printf("Reduced lows are:\n");
-  print_array(reduced_lows, n);
-
-  free(reduced_col_idxs);
-  free(reduced_row_idxs);
-  free(reduced_lows);
+  } else {
+    /*printf("Reduced lows are:\n");*/
+    /*print_array(reduced_lows, n);*/
+    printf("Writing lows to file\n");
+    write_array(reduced_lows, n, output_file);
+    free(reduced_lows);
+  }
 }
 

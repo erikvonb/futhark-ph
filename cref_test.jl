@@ -90,7 +90,7 @@ function main()
     print("\nChecking file ")
     println(filename_in)
 
-    run(`./main $filename_in $filename_out`)
+    run(`./main -i $filename_in -o $filename_out -m`)
 
     println("reading original")
     # d_original´ = readdlm(filename_in,  ' ', Int, '\n')
