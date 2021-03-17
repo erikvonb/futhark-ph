@@ -44,13 +44,16 @@ void print_array_32(int32_t* array, int n) {
   printf("\n");
 }
 
-void reduce(
+int reduce(
     int32_t* col_idxs, int32_t* row_idxs, int64_t n, int nnz,
-    bool should_write_matrix,
+    bool should_write_matrix, bool debug,
     int32_t** out_col_idxs, int32_t** out_row_idxs, int64_t** out_lows,
     int64_t* out_nnz) {
 
   struct futhark_context_config* config = futhark_context_config_new();
+  if (debug) {
+    futhark_context_config_set_debugging(config, 1);
+  }
   struct futhark_context* context = futhark_context_new(config); 
 
   const char* error = futhark_context_get_error(context);
@@ -70,7 +73,7 @@ void reduce(
   struct futhark_i32_1d* fut_reduced_col_idxs = NULL;
   struct futhark_i32_1d* fut_reduced_row_idxs = NULL;
   struct futhark_i64_1d* fut_reduced_lows = NULL;
-  futhark_entry_reduce_matrix(
+  int e = futhark_entry_reduce_matrix(
       context,
       &fut_reduced_col_idxs,
       &fut_reduced_row_idxs,
@@ -79,14 +82,25 @@ void reduce(
       fut_row_idxs,
       n);
 
+  if (e != 0) {
+    char* error_string = futhark_context_get_error(context);
+    printf("Entry failed with error:\n%s\n", error_string);
+    free(error_string);
+    return 1;
+  }
+
   printf("Done reducing\n");
   futhark_context_sync(context);
+  printf("Synced Futhark context\n");
 
-  const int64_t* reduced_nnz_dims =
+  const int64_t* reduced_col_dims =
     futhark_shape_i32_1d(context, fut_reduced_col_idxs);
+  printf("Got col dimensions\n");
+  int64_t reduced_nnz = reduced_col_dims[0];
+  printf("Final number of nonzeroes is %ld\n", reduced_nnz);
 
-  int32_t* reduced_col_idxs = malloc(reduced_nnz_dims[0] * sizeof(int32_t));
-  int32_t* reduced_row_idxs = malloc(reduced_nnz_dims[0] * sizeof(int32_t));
+  int32_t* reduced_col_idxs = malloc(reduced_nnz * sizeof(int32_t));
+  int32_t* reduced_row_idxs = malloc(reduced_nnz * sizeof(int32_t));
   int64_t* reduced_lows = malloc(n * sizeof(int64_t));
 
   printf("Copying to host...\n");
@@ -110,19 +124,22 @@ void reduce(
   futhark_context_free(context);
   futhark_context_config_free(config);
 
-  *out_nnz = reduced_nnz_dims[0];
+  *out_nnz = reduced_nnz;
   *out_col_idxs = reduced_col_idxs;
   *out_row_idxs = reduced_row_idxs;
   *out_lows = reduced_lows;
+
+  return 0;
 }
 
 int main(int argc, char *argv[]) {
   char* input_file;
   char* output_file;
   bool should_write_matrix = false;
+  bool debug = false;
 
   char c;
-  while( (c = getopt(argc, argv, "i:o:m")) != -1 ) {
+  while( (c = getopt(argc, argv, "i:o:md")) != -1 ) {
     switch(c) {
       case 'i':
         input_file = optarg;
@@ -133,7 +150,19 @@ int main(int argc, char *argv[]) {
       case 'm':
         should_write_matrix = true;
         break;
+      case 'd':
+        debug = true;
+        break;
     }
+  }
+
+  if (input_file == NULL) {
+    printf("No input file given. Try -i\n");
+    return EXIT_FAILURE;
+  }
+  if (output_file == NULL) {
+    printf("No output file given. Try -o\n");
+    return EXIT_FAILURE;
   }
 
   int64_t n;
@@ -142,6 +171,7 @@ int main(int argc, char *argv[]) {
   int32_t* col_idxs;
   read_sparse_matrix(&row_idxs, &col_idxs, &nnz, &n, input_file);
 
+  printf("Initial matrix has %ld columns and %d nonzeroes\n", n, nnz);
   /*printf("Initial matrix is:\n");*/
   /*print_matrix(sparse_to_dense(col_idxs, row_idxs, nnz, n), n);*/
 
@@ -150,11 +180,16 @@ int main(int argc, char *argv[]) {
   int32_t* reduced_row_idxs;
   int64_t* reduced_lows;
 
-  reduce(col_idxs, row_idxs, n, nnz, should_write_matrix,
+  int e = reduce(col_idxs, row_idxs, n, nnz, should_write_matrix, debug,
       &reduced_col_idxs, &reduced_row_idxs, &reduced_lows, &reduced_nnz);
 
   free(col_idxs);
   free(row_idxs);
+
+  if (e != 0) {
+    printf("Reduction failed.\n");
+    return EXIT_FAILURE;
+  }
 
   if (should_write_matrix) {
     int32_t* reduced_dense_matrix =

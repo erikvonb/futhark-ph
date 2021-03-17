@@ -77,6 +77,10 @@ void read_dense_matrix(char* filename, int32_t* out_matrix, int* out_n) {
 
 void write_dense_matrix(int32_t* matrix, int n, char* filename) {
   FILE* fp = fopen(filename, "w");
+  if (fp == NULL) {
+    printf("Failed to open file %s\n", filename);
+    return;
+  }
 
   for (size_t i = 0; i < n; i++) {
     for (size_t j = 0; j < n; j++) {
@@ -95,9 +99,13 @@ void write_dense_matrix(int32_t* matrix, int n, char* filename) {
 
 void write_array(int64_t* array, int n, char* filename) {
   FILE* fp = fopen(filename, "w");
+  if (fp == NULL) {
+    printf("Failed to open file %s\n", filename);
+    return;
+  }
 
   for (size_t i = 0; i < n; i++) {
-    fprintf(fp, "%ld ", array[i]);
+    fprintf(fp, "%ld\n", array[i]);
   }
   fclose(fp);
 }
