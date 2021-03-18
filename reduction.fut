@@ -3,7 +3,6 @@ import "sparse"
 
 type~ state [n] =
   { matrix: csc_mat
-  , classes: [n]i32
   , lows: [n]i64
   , lefts: [n]i64
   , arglows: [n]i64
@@ -18,20 +17,14 @@ let beta_j (d: csc_mat) (j: i64): i64 =
 let phase_0 [n] (s: state[n]): state[n] =
   let betas = map (beta_j s.matrix) (iota n)
 
-  -- If low(j) == β_j, mark j as negative
-  let idxs = map (\j -> if betas[j] == s.lows[j] then j else -1) (iota n)
-  let classes' = scatter (copy s.classes) idxs (replicate n (-1))
-
   -- If low(j) == β_j, mark low(j) as positive and clear it
   let idxs' = map (\j -> if betas[j] == s.lows[j] then s.lows[j] else -1) (iota n)
-  let classes'' = scatter (copy classes') idxs' (replicate n 1)
   let lows' = scatter (copy s.lows) idxs' (replicate n (-1))
   let arglows' = scatter (copy s.arglows) idxs' (iota n)
   -- the actual clearing is unnecessary for the algorithm to work
   -- let matrix' = scatter (copy s.matrix) idxs' (replicate n (replicate n 0))
 
-  in s with classes = classes''
-       with lows = lows'
+  in s with lows = lows'
        with arglows = arglows'
        -- with matrix = matrix'
 
@@ -58,11 +51,9 @@ let phase_1 [n] (s: state[n]): state[n] =
   let pivot_low_js = map (\j -> if j == -1 then -1 else s.lows[j]) pivot_js
 
   let arglows' = scatter (copy s.arglows) pivot_low_js pivot_js
-  let classes' = scatter (copy s.classes) pivot_js (replicate n (-1))
   let is_positive'= scatter (copy s.is_positive) pivot_low_js (replicate n true)
                         
   in s with arglows = arglows'
-       with classes = classes'
        with is_positive = is_positive'
 
 let phase_2 [n] (s: state[n]): state[n] =
@@ -82,8 +73,6 @@ let phase_2 [n] (s: state[n]): state[n] =
                && new_lows[j] > -1
                && j == s.lefts[new_lows[j]])
         (iota n)
-  let new_classes =
-    map (\j -> if is_new_pivot[j] then -1 else s.classes[j]) (iota n)
 
   let new_pivot_is = map (\j -> if is_new_pivot[j] then j else -1) (iota n)
   let new_arglow_is = map (\j -> if j > -1 then new_lows[j] else -1) new_pivot_is
@@ -94,17 +83,13 @@ let phase_2 [n] (s: state[n]): state[n] =
 
   in s with matrix = new_matrix
        with lows = new_lows
-       with classes = new_classes
        with is_positive = new_is_positive
        with arglows = new_arglows
 
 let clear_positives [n] (s: state[n]): state[n] =
   let lows' =
     map (\j -> if s.is_positive[j] then -1 else s.lows[j]) (iota n)
-  let classes' =
-    map (\j -> if s.is_positive[j] then 1 else s.classes[j]) (iota n)
   in s with lows = lows'
-       with classes = classes'
 
 let is_reduced [n] (s: state[n]): bool =
   all (\j -> s.lows[j] == -1 || s.arglows[s.lows[j]] == j) (iota n)
@@ -135,7 +120,6 @@ entry reduce_matrix (col_idxs: []i32) (row_idxs: []i32) (n: i64): ([]i32, []i32,
   let d = coo2_to_csc (zip col_idxs row_idxs |> sort_coo2) n
   let s =
     { matrix = d
-    , classes = replicate n 0
     , lows = map (low d) (iota n)
     , lefts = map (left d) (iota n)
     , arglows = replicate n (-1)
