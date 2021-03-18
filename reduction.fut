@@ -36,7 +36,6 @@ let phase_0 [n] (s: state[n]): state[n] =
        -- with matrix = matrix'
 
 let phase_1 [n] (s: state[n]): state[n] =
-  -- TODO confirm that radix_sort_by_key is stable
   let (sorted_lows, sorted_js) = unzip <|
     radix_sort_by_key (.0) 64 i64.get_bit (zip s.lows (iota n))
 
@@ -145,8 +144,6 @@ entry reduce_matrix (col_idxs: []i32) (row_idxs: []i32) (n: i64): ([]i32, []i32,
     |> reduce_state
   let (col_idxs', row_idxs') = s.matrix |> csc_to_coo2 |> unzip
   in (col_idxs', row_idxs', s.lows)
-  -- (copy row_idxs, copy col_idxs, [])
-  -- ([], [], [])
 
 let d0: [][]i32 = transpose
  [[0,0,0,0,0,0,0,0,1,0],
