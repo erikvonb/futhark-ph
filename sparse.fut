@@ -10,7 +10,7 @@ type~ csc_mat =
 -- (j, i); column index, row index
 type coo2_mat [n] = [n](i32, i32)
 
-let get_csc_row (d: csc_mat) (j: i64): []i32 =
+let get_csc_col (d: csc_mat) (j: i64): []i32 =
   d.row_idxs[d.col_offsets[j] : d.col_offsets[j+1]]
 
 let sort_coo2 [n] (d: coo2_mat[n]): coo2_mat[n] =
@@ -21,7 +21,7 @@ let sort_coo2 [n] (d: coo2_mat[n]): coo2_mat[n] =
 
 let low (d: csc_mat) (j: i64): i64 =
   -- TODO if rows are sorted, low is just the last element
-  let i = get_csc_row d j |> i32.maximum |> i64.i32
+  let i = get_csc_col d j |> i32.maximum |> i64.i32
   in if i < 0 then -1 else i
 
 let last_occurrence [n] 't (xs: [n]t) (pred: t -> bool): i64 =
@@ -34,7 +34,7 @@ let first_occurrence [n] 't (xs: [n]t) (pred: t -> bool): i64 =
   
 let left (d: csc_mat) (i: i64): i64 =
   let n = length d.col_offsets - 1
-  let flag j = any (== i32.i64 i) (get_csc_row d j)
+  let flag j = any (== i32.i64 i) (get_csc_col d j)
   in first_occurrence (map flag (iota n)) id
 
 -- let clear_column (d: csc_mat) (j: i64): csc_mat =
@@ -89,7 +89,7 @@ let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64): csc_mat =
     else col_sizes[j] + col_sizes[arglows[lows[j]]]
   let make_coo2_element j j_row =
     ( i32.i64 j
-    , (get_csc_row d j ++ get_csc_row d arglows[lows[j]])[j_row]
+    , (get_csc_col d j ++ get_csc_col d arglows[lows[j]])[j_row]
     )
 
   -- Expand into intermediate COO matrix
