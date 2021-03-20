@@ -91,7 +91,7 @@ let clear_positives [n] (s: state[n]): state[n] =
     map (\j -> if s.is_positive[j] then -1 else s.lows[j]) (iota n)
   in s with lows = lows'
 
-let is_reduced [n] (s: state[n]): bool =
+entry is_reduced [n] (s: state[n]): bool =
   all (\j -> s.lows[j] == -1 || s.arglows[s.lows[j]] == j) (iota n)
 
 let reduce_state [n] (s_init: state[n]): state[n] =
@@ -115,6 +115,30 @@ let reduce_state [n] (s_init: state[n]): state[n] =
     in (s3, converged)
       
   in final_state
+
+let reset_positives [n] (s: state[n]): state[n] =
+  s with is_positive = replicate n false
+
+entry iterate_step [n] (s: state[n]): state[n] =
+  s |> reset_positives |> phase_1 |> clear_positives
+    |> reset_positives |> phase_2 |> clear_positives
+
+entry init_state (col_idxs: []i32) (row_idxs: []i32) (n: i64): state[n] =
+  let d = coo2_to_csc (zip col_idxs row_idxs |> sort_coo2) n
+  in { matrix      = d
+     , lows        = map (low d) (iota n)
+     , lefts       = map (left d) (iota n)
+     , arglows     = replicate n (-1)
+     , is_positive = replicate n false
+     }
+     |> phase_0
+
+entry state_nnz [n] (s: state[n]): i64 =
+  length <| s.matrix.row_idxs
+
+entry state_contents [n] (s: state[n]): ([]i32, []i32, []i64) =
+  let (col_idxs, row_idxs) = s.matrix |> csc_to_coo2 |> unzip
+  in (col_idxs, row_idxs, s.lows)
 
 entry reduce_matrix (col_idxs: []i32) (row_idxs: []i32) (n: i64): ([]i32, []i32, []i64) =
   let d = coo2_to_csc (zip col_idxs row_idxs |> sort_coo2) n

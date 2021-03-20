@@ -7,11 +7,21 @@ type~ csc_mat =
   -- , values: []i32
   }
 
+-- Append-only matrix type, for storing the reduced columns
+type~ const_mat =
+  { col_offsets: []i64
+  , row_idxs: []i32
+  , col_idx_map: []i64
+  }
+
 -- (j, i); column index, row index
 type coo2_mat [n] = [n](i32, i32)
 
 let get_csc_col (d: csc_mat) (j: i64): []i32 =
   d.row_idxs[d.col_offsets[j] : d.col_offsets[j+1]]
+
+let csc_col_nnz (d: csc_mat) (j: i64): i64 =
+  d.col_offsets[j+1] - d.col_offsets[j]
 
 let sort_coo2 [n] (d: coo2_mat[n]): coo2_mat[n] =
   radix_sort
@@ -90,6 +100,10 @@ let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64): csc_mat =
   let make_coo2_element j j_row =
     ( i32.i64 j
     , (get_csc_col d j ++ get_csc_col d arglows[lows[j]])[j_row]
+    -- , let l = csc_col_nnz d j
+      -- in if j_row < l
+         -- then (get_csc_col d j)[j_row]
+         -- else (get_csc_col d arglows[lows[j]])[j_row - l]
     )
 
   -- Expand into intermediate COO matrix

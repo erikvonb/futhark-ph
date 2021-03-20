@@ -44,6 +44,16 @@ void print_array_32(int32_t* array, int n) {
   printf("\n");
 }
 
+bool handle_error(struct futhark_context *ctx, int e, char* entry_name) {
+  if (e != 0) {
+    char* error_string = futhark_context_get_error(ctx);
+    printf("Entry %s failed with error:\n%s\n", entry_name, error_string);
+    free(error_string);
+    return true;
+  }
+  return false;
+}
+
 int reduce(
     int32_t* col_idxs, int32_t* row_idxs, int64_t n, int nnz,
     bool should_write_matrix, bool debug,
@@ -70,40 +80,52 @@ int reduce(
     futhark_new_i32_1d(context, row_idxs, nnz);
 
   printf("Reducing...\n");
-  struct futhark_i32_1d* fut_reduced_col_idxs = NULL;
-  struct futhark_i32_1d* fut_reduced_row_idxs = NULL;
-  struct futhark_i64_1d* fut_reduced_lows = NULL;
-  int e = futhark_entry_reduce_matrix(
-      context,
-      &fut_reduced_col_idxs,
-      &fut_reduced_row_idxs,
-      &fut_reduced_lows,
-      fut_col_idxs,
-      fut_row_idxs,
-      n);
-
-  if (e != 0) {
-    char* error_string = futhark_context_get_error(context);
-    printf("Entry failed with error:\n%s\n", error_string);
-    free(error_string);
+  int err;
+  struct futhark_opaque_state* fut_state_in;
+  struct futhark_opaque_state* fut_state_out;
+  err = futhark_entry_init_state(context, &fut_state_in,
+      fut_col_idxs, fut_row_idxs, n);
+  if (handle_error(context, err, "init_state")) {
     return 1;
+  }
+
+  bool converged = false;
+  while (!converged) {
+    err = futhark_entry_iterate_step(context, &fut_state_out, fut_state_in);
+    if (handle_error(context, err, "iterate_step")) {
+      return 1;
+    }
+    futhark_entry_is_reduced(context, &converged, fut_state_out);
+
+    struct futhark_opaque_state* tmp = fut_state_in;
+    fut_state_in = fut_state_out;
+    fut_state_out = tmp;
   }
 
   printf("Done reducing\n");
   futhark_context_sync(context);
-  printf("Synced Futhark context\n");
 
-  const int64_t* reduced_col_dims =
-    futhark_shape_i32_1d(context, fut_reduced_col_idxs);
-  printf("Got col dimensions\n");
-  int64_t reduced_nnz = reduced_col_dims[0];
+  int64_t reduced_nnz;
+  err = futhark_entry_state_nnz(context, &reduced_nnz, fut_state_in);
+  if (handle_error(context, err, "state_nnz")) {
+    return 1;
+  }
+  futhark_context_sync(context);
   printf("Final number of nonzeroes is %ld\n", reduced_nnz);
 
+  struct futhark_i32_1d* fut_reduced_col_idxs;
+  struct futhark_i32_1d* fut_reduced_row_idxs;
+  struct futhark_i64_1d* fut_reduced_lows;
   int32_t* reduced_col_idxs = malloc(reduced_nnz * sizeof(int32_t));
   int32_t* reduced_row_idxs = malloc(reduced_nnz * sizeof(int32_t));
   int64_t* reduced_lows = malloc(n * sizeof(int64_t));
 
   printf("Copying to host...\n");
+  futhark_entry_state_contents(context,
+      &fut_reduced_col_idxs, &fut_reduced_row_idxs, &fut_reduced_lows,
+      fut_state_in);
+  futhark_context_sync(context);
+
   if (should_write_matrix) {
     futhark_values_i32_1d(context, fut_reduced_col_idxs, reduced_col_idxs);
     futhark_values_i32_1d(context, fut_reduced_row_idxs, reduced_row_idxs);
@@ -112,8 +134,9 @@ int reduce(
     futhark_values_i64_1d(context, fut_reduced_lows, reduced_lows);
   }
 
-  printf("Done\n");
   printf("Freeing futhark data\n");
+  futhark_free_opaque_state(context, fut_state_in);
+  futhark_free_opaque_state(context, fut_state_out);
   futhark_free_i32_1d(context, fut_col_idxs);
   futhark_free_i32_1d(context, fut_row_idxs);
   futhark_free_i32_1d(context, fut_reduced_col_idxs);
@@ -182,6 +205,7 @@ int main(int argc, char *argv[]) {
 
   int e = reduce(col_idxs, row_idxs, n, nnz, should_write_matrix, debug,
       &reduced_col_idxs, &reduced_row_idxs, &reduced_lows, &reduced_nnz);
+  printf("exied\n");
 
   free(col_idxs);
   free(row_idxs);
