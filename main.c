@@ -205,7 +205,6 @@ int main(int argc, char *argv[]) {
 
   int e = reduce(col_idxs, row_idxs, n, nnz, should_write_matrix, debug,
       &reduced_col_idxs, &reduced_row_idxs, &reduced_lows, &reduced_nnz);
-  printf("exied\n");
 
   free(col_idxs);
   free(row_idxs);

@@ -44,8 +44,12 @@ let first_occurrence [n] 't (xs: [n]t) (pred: t -> bool): i64 =
   
 let left (d: csc_mat) (i: i64): i64 =
   let n = length d.col_offsets - 1
-  let flag j = any (== i32.i64 i) (get_csc_col d j)
-  in first_occurrence (map flag (iota n)) id
+  -- let flag j = any (== i32.i64 i) (get_csc_col d j)
+  -- in first_occurrence (map flag (iota n)) id
+  in (loop (j0, done) = (-1, false) for j < n do
+        if !done && any (== i32.i64 i) (get_csc_col d j)
+          then (j, true) else (j0, done)
+     ).0
 
 -- let clear_column (d: csc_mat) (j: i64): csc_mat =
   -- let col_start = d.col_offsets[j]
