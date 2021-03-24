@@ -121,17 +121,25 @@ int reduce(
   int64_t* reduced_lows = malloc(n * sizeof(int64_t));
 
   printf("Copying to host...\n");
-  futhark_entry_state_contents(context,
-      &fut_reduced_col_idxs, &fut_reduced_row_idxs, &fut_reduced_lows,
-      fut_state_in);
-  futhark_context_sync(context);
+  /*futhark_entry_state_contents(context,*/
+      /*&fut_reduced_col_idxs, &fut_reduced_row_idxs, &fut_reduced_lows,*/
+      /*fut_state_in);*/
+  /*futhark_context_sync(context);*/
 
   if (should_write_matrix) {
+    futhark_entry_state_matrix_coo(context,
+        &fut_reduced_col_idxs, &fut_reduced_row_idxs, fut_state_in);
+    futhark_context_sync(context);
     futhark_values_i32_1d(context, fut_reduced_col_idxs, reduced_col_idxs);
     futhark_values_i32_1d(context, fut_reduced_row_idxs, reduced_row_idxs);
+    futhark_free_i32_1d(context, fut_reduced_col_idxs);
+    futhark_free_i32_1d(context, fut_reduced_row_idxs);
 
   } else {
+    futhark_entry_state_lows(context, &fut_reduced_lows, fut_state_in);
+    futhark_context_sync(context);
     futhark_values_i64_1d(context, fut_reduced_lows, reduced_lows);
+    futhark_free_i64_1d(context, fut_reduced_lows);
   }
 
   printf("Freeing futhark data\n");
@@ -139,9 +147,9 @@ int reduce(
   futhark_free_opaque_state(context, fut_state_out);
   futhark_free_i32_1d(context, fut_col_idxs);
   futhark_free_i32_1d(context, fut_row_idxs);
-  futhark_free_i32_1d(context, fut_reduced_col_idxs);
-  futhark_free_i32_1d(context, fut_reduced_row_idxs);
-  futhark_free_i64_1d(context, fut_reduced_lows);
+  /*futhark_free_i32_1d(context, fut_reduced_col_idxs);*/
+  /*futhark_free_i32_1d(context, fut_reduced_row_idxs);*/
+  /*futhark_free_i64_1d(context, fut_reduced_lows);*/
 
   printf("Freeing futhark context and config\n");
   futhark_context_free(context);
@@ -205,9 +213,11 @@ int main(int argc, char *argv[]) {
 
   int e = reduce(col_idxs, row_idxs, n, nnz, should_write_matrix, debug,
       &reduced_col_idxs, &reduced_row_idxs, &reduced_lows, &reduced_nnz);
+  printf("reduce call done\n");
 
   free(col_idxs);
   free(row_idxs);
+  printf("freed\n");
 
   if (e != 0) {
     printf("Reduction failed.\n");

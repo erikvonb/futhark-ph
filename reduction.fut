@@ -134,11 +134,15 @@ entry init_state (col_idxs: []i32) (row_idxs: []i32) (n: i64): state[n] =
      |> phase_0
 
 entry state_nnz [n] (s: state[n]): i64 =
-  length <| s.matrix.row_idxs
+  -- length <| s.matrix.row_idxs
+  s.matrix.row_idxs |> map (\i -> if i > -1 then 1 else 0) |> reduce (+) 0
 
-entry state_contents [n] (s: state[n]): ([]i32, []i32, []i64) =
-  let (col_idxs, row_idxs) = s.matrix |> csc_to_coo2 |> unzip
-  in (col_idxs, row_idxs, s.lows)
+entry state_matrix_coo [n] (s: state[n]): ([]i32, []i32) =
+  let (col_idxs, row_idxs) = s.matrix |> csc_to_coo2 |> filter (\(_,i) -> i != -1) |> unzip
+  in (col_idxs, row_idxs)
+
+entry state_lows [n] (s: state[n]): []i64 =
+  s.lows
 
 entry state_contents_debug [n] (s: state[n]): i64 = s.debug
 

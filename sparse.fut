@@ -114,24 +114,19 @@ let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64): csc_mat =
   let coo2 = expand new_col_size_bound make_coo2_element (iota n)
 
   -- Sort the columns by row index
-  let (sorted_cols, sorted_rows) = unzip <| sort_coo2 coo2
+  let coo2 = sort_coo2 coo2
 
-  -- Compress the sorted COO matrix into a COO3 matrix (i.e. with values)
-  let segments_1 = map2 (!=) (rotate (-1) sorted_cols) sorted_cols
-  let segments_2 = map2 (!=) (rotate (-1) sorted_rows) sorted_rows
-  -- Start new segment whenever column index or row index changes
-  let segments = map2 (||) segments_1 segments_2
-  let coo3 =
-    segmented_reduce
-      (\(j1, i1, v1) (j2, i2, v2) -> (i32.min j1 j2, i32.min i1 i2, (v1 + v2) % 2))
-      (i32.highest, i32.highest, 0)
-      segments
-      (zip3 sorted_cols sorted_rows <| map (const 1) sorted_cols)
+  -- Flag the first occurrence of any duplicate
+  let flags = map2 (\(j1,i1) (j2,i2) -> j1 == j2 && i1 == i2)
+                   coo2
+                   (rotate 1 coo2)
+  -- Map all duplicates to -1
+  let coo2 = map2 (\x f -> if f then (x.0, -1) else x) coo2 flags
+  let coo2 = map2 (\x f -> if f then (x.0, -1) else x) coo2 (rotate (-1) flags)
+  let coo2 = filter (\(_,i) -> i != -1) coo2
 
-  -- Convert COO3 back into CSC
-  let coo3' = filter (\(_,_,v) -> v != 0) coo3
-  let coo2' = zip (unzip3 coo3').0 (unzip3 coo3').1
-  in coo2_to_csc coo2' (length d.col_offsets - 1)
+  -- Convert back to CSC
+  in coo2_to_csc coo2 n
 
 -- 0 0 1 0
 -- 0 0 1 1
