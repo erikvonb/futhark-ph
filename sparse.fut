@@ -87,7 +87,8 @@ let csc_to_coo2 (d: csc_mat): [](i32, i32) =
             (\j k -> ( i32.i64 j, d.row_idxs[d.col_offsets[j] + k]))
             (iota n)
 
-let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64): csc_mat =
+let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64)
+                    (iteration: i32): csc_mat =
   -- Define functions for expansion
   let col_sizes = init <| map2 (-) (rotate 1 d.col_offsets) d.col_offsets
   let new_col_size_bound j =
@@ -124,6 +125,10 @@ let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64): csc_mat =
   let coo2 = map2 (\x f -> if f then (x.0, -1) else x) coo2 flags
   let coo2 = map2 (\x f -> if f then (x.0, -1) else x) coo2 (rotate (-1) flags)
   let coo2 = filter (\(_,i) -> i != -1) coo2
+  -- let coo2 =
+    -- if iteration % 20 == 0
+      -- then filter (\(_,i) -> i != -1) coo2
+      -- else coo2
 
   -- Convert back to CSC
   in coo2_to_csc coo2 n

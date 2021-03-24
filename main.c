@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <time.h>
 
 
 int32_t* sparse_to_dense(int32_t* col_idxs, int32_t* row_idxs, int nnz, int n) {
@@ -60,10 +61,18 @@ int reduce(
     int32_t** out_col_idxs, int32_t** out_row_idxs, int64_t** out_lows,
     int64_t* out_nnz) {
 
+  struct timespec start_time;
+  struct timespec end_time;
+  double time_elapsed_s;
+  long time_elapsed_ns;
+
+  timespec_get(&start_time, TIME_UTC);
+
   struct futhark_context_config* config = futhark_context_config_new();
   if (debug) {
     futhark_context_config_set_debugging(config, 1);
   }
+  /*futhark_context_config_set_profiling(config, 1);*/
   struct futhark_context* context = futhark_context_new(config); 
 
   const char* error = futhark_context_get_error(context);
@@ -89,8 +98,18 @@ int reduce(
     return 1;
   }
 
+  timespec_get(&end_time, TIME_UTC);
+  time_elapsed_s = difftime(end_time.tv_sec, start_time.tv_sec);
+  time_elapsed_ns = end_time.tv_nsec - start_time.tv_nsec;
+  printf("Phase 0 done after %.2fms\n",
+      time_elapsed_s * 1e3 + (float)time_elapsed_ns * 1e-6);
+
   bool converged = false;
+  int n_iterations = 0;
+  
   while (!converged) {
+    n_iterations++;
+    
     err = futhark_entry_iterate_step(context, &fut_state_out, fut_state_in);
     if (handle_error(context, err, "iterate_step")) {
       return 1;
@@ -102,8 +121,14 @@ int reduce(
     fut_state_out = tmp;
   }
 
-  printf("Done reducing\n");
+  printf("Finished reducing after %d iterations\n", n_iterations);
   futhark_context_sync(context);
+  
+  timespec_get(&end_time, TIME_UTC);
+  time_elapsed_s = difftime(end_time.tv_sec, start_time.tv_sec);
+  time_elapsed_ns = end_time.tv_nsec - start_time.tv_nsec;
+  printf("Main loop done after %.2fms\n",
+      time_elapsed_s * 1e3 + (float)time_elapsed_ns * 1e-6);
 
   int64_t reduced_nnz;
   err = futhark_entry_state_nnz(context, &reduced_nnz, fut_state_in);
@@ -121,10 +146,6 @@ int reduce(
   int64_t* reduced_lows = malloc(n * sizeof(int64_t));
 
   printf("Copying to host...\n");
-  /*futhark_entry_state_contents(context,*/
-      /*&fut_reduced_col_idxs, &fut_reduced_row_idxs, &fut_reduced_lows,*/
-      /*fut_state_in);*/
-  /*futhark_context_sync(context);*/
 
   if (should_write_matrix) {
     futhark_entry_state_matrix_coo(context,
@@ -147,13 +168,15 @@ int reduce(
   futhark_free_opaque_state(context, fut_state_out);
   futhark_free_i32_1d(context, fut_col_idxs);
   futhark_free_i32_1d(context, fut_row_idxs);
-  /*futhark_free_i32_1d(context, fut_reduced_col_idxs);*/
-  /*futhark_free_i32_1d(context, fut_reduced_row_idxs);*/
-  /*futhark_free_i64_1d(context, fut_reduced_lows);*/
+
+  /*char* context_report = futhark_context_report(context);*/
+  /*printf("\nContext report:\n%s\n", context_report);*/
+  /*free(context_report);*/
 
   printf("Freeing futhark context and config\n");
   futhark_context_free(context);
   futhark_context_config_free(config);
+
 
   *out_nnz = reduced_nnz;
   *out_col_idxs = reduced_col_idxs;
@@ -213,11 +236,9 @@ int main(int argc, char *argv[]) {
 
   int e = reduce(col_idxs, row_idxs, n, nnz, should_write_matrix, debug,
       &reduced_col_idxs, &reduced_row_idxs, &reduced_lows, &reduced_nnz);
-  printf("reduce call done\n");
 
   free(col_idxs);
   free(row_idxs);
-  printf("freed\n");
 
   if (e != 0) {
     printf("Reduction failed.\n");

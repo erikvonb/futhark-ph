@@ -7,6 +7,7 @@ type~ state [n] =
   , lefts: [n]i64
   , arglows: [n]i64
   , is_positive: [n]bool
+  , iteration: i32
   , debug: i64
   }
 
@@ -59,7 +60,7 @@ let phase_2 [n] (s: state[n]): state[n] =
   let can_be_reduced =
     map (\j -> s.lows[j] != -1 && s.arglows[s.lows[j]] != j) (iota n)
 
-  let new_matrix = reduce_step s.matrix s.lows s.arglows
+  let new_matrix = reduce_step s.matrix s.lows s.arglows s.iteration
 
   let new_lows =
     -- map (\j -> if can_be_reduced[j] then low new_matrix j else s.lows[j])
@@ -119,8 +120,9 @@ let reset_positives [n] (s: state[n]): state[n] =
   s with is_positive = replicate n false
 
 entry iterate_step [n] (s: state[n]): state[n] =
-  s |> reset_positives |> phase_1 |> clear_positives
-    |> reset_positives |> phase_2 |> clear_positives
+  let s = s |> reset_positives |> phase_1 |> clear_positives
+            |> reset_positives |> phase_2 |> clear_positives
+  in s with iteration = s.iteration + 1
 
 entry init_state (col_idxs: []i32) (row_idxs: []i32) (n: i64): state[n] =
   let d = coo2_to_csc (zip col_idxs row_idxs |> sort_coo2) n
@@ -129,6 +131,7 @@ entry init_state (col_idxs: []i32) (row_idxs: []i32) (n: i64): state[n] =
      , lefts       = map (left d) (iota n)
      , arglows     = replicate n (-1)
      , is_positive = replicate n false
+     , iteration = 0
      , debug = 0
      }
      |> phase_0
