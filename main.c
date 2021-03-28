@@ -119,6 +119,13 @@ int reduce(
     struct futhark_opaque_state* tmp = fut_state_in;
     fut_state_in = fut_state_out;
     fut_state_out = tmp;
+
+    // statistics gathering
+    int32_t n_additions_available;
+    int32_t n_zero_cols;
+    futhark_entry_state_n_additions_available(context, &n_additions_available, fut_state_in);
+    futhark_entry_state_n_zero_cols(context, &n_zero_cols, fut_state_in);
+    printf("n adds: %d  n zero cols: %d\n", n_additions_available, n_zero_cols);
   }
 
   printf("Finished reducing after %d iterations\n", n_iterations);

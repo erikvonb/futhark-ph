@@ -11,7 +11,16 @@ type~ csc_mat =
 type~ const_mat =
   { col_offsets: []i64
   , row_idxs: []i32
+  -- Could be a hash map?
   , col_idx_map: []i64
+  , map_ptr: i64
+  }
+
+let empty_const_mat (n: i64): const_mat =
+  { col_offsets = [0]
+  , row_idxs = []
+  , col_idx_map = replicate n (-1)
+  , map_ptr = 0
   }
 
 -- (j, i); column index, row index
@@ -44,23 +53,10 @@ let first_occurrence [n] 't (xs: [n]t) (pred: t -> bool): i64 =
   
 let left (d: csc_mat) (i: i64): i64 =
   let n = length d.col_offsets - 1
-  -- let flag j = any (== i32.i64 i) (get_csc_col d j)
-  -- in first_occurrence (map flag (iota n)) id
   in (loop (j0, done) = (-1, false) for j < n do
         if !done && any (== i32.i64 i) (get_csc_col d j)
           then (j, true) else (j0, done)
      ).0
-
--- let clear_column (d: csc_mat) (j: i64): csc_mat =
-  -- let col_start = d.col_offsets[j]
-  -- let col_end = d.col_offsets[j + 1]
-  -- let col_length = col_end - col_start
-
-  -- let row_idxs' = d.row_idxs[0:col_start - 1] ++ d.row_idxs[col_end:]
-  -- let col_offsets' = d.col_offsets[0:j + 1]
-                     -- ++ map (\x -> x - col_length) d.col_offsets[j + 1:]
-
-  -- in { col_offsets = col_offsets', row_idxs = row_idxs' }
 
 let coo2_to_csc [n] (d: coo2_mat[n]) (n_cols: i64): csc_mat =
   let col_idxs = (unzip2 d).0
