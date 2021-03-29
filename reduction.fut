@@ -179,13 +179,7 @@ entry state_n_zero_cols [n] (s: state[n]): i32 =
   count s.lows (== -1)
 
 entry state_n_additions_available [n] (s: state[n]): i32 =
-  count s.lows (\l -> l != -1 && s.arglows[l] != l)
-  -- s.lows |> map (\l -> if l == -1 || s.arglows[l] == l then 0 else 1)
-         -- |> reduce (+) 0
-  -- let sorted_lows = radix_sort 64 i64.get_bit s.lows
-  -- let segments = map2 (==) sorted_lows (rotate (-1) sorted_lows)
-  -- in (iota n) |> map (\j -> if s.lows[j] == -1 || segments[j] then 0 else 1)
-              -- |> reduce (+) 0
+  count (iota n) (\j -> s.lows[j] != -1 && s.arglows[s.lows[j]] != j)
 
 entry state_matrix_coo [n] (s: state[n]): ([]i32, []i32) =
   let (col_idxs, row_idxs) = s.matrix |> csc_to_coo2 |> filter (\(_,i) -> i != -1) |> unzip
