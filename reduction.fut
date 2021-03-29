@@ -80,32 +80,18 @@ let phase_0 [n] (s: state[n]): state[n] =
        with arglows = arglows'
 
 let phase_1 [n] (s: state[n]): state[n] =
-  let (sorted_lows, sorted_js) = unzip <|
-    radix_sort_by_key (.0) 64 i64.get_bit (zip s.lows (iota n))
-
-  -- Flag/mark j ∈ sorted_js if it's a potential pivot
-  -- Ex: [2, 3, 3, 4, 1] -> [T, T, F, T, T]
-  let is_potential_pivot = map2 (!=) sorted_lows (rotate (-1) sorted_lows)
-
-  -- j ∈ pivot_js is either the index of a pivot, or -1
-  -- Ex: [2, 3, 3, 4, 1] -> [T, T, F, T, F]
-  -- 2, 1st 3, 4 are pivots because they're leftmost and > max_collision.
-  -- 2nd 3 is not a pivot because it's not leftmost, so not potential pivot.
-  -- 1 is leftmost but is not > max_collision = 3, so it's not a pivot.
-  let pivot_js = 
-    map (\j -> if is_potential_pivot[j]
-               then sorted_js[j]
-               else -1)
-        (iota n)
-
-  -- low(pivot_js) elementwise
-  let pivot_low_js = map (\j -> if j == -1 then -1 else s.lows[j]) pivot_js
-
-  let arglows' = scatter (copy s.arglows) pivot_low_js pivot_js
-  let is_positive'= scatter (copy s.is_positive) pivot_low_js (replicate n true)
-                        
+  let arglows' = reduce_by_index (replicate n i64.highest)
+                                 i64.min
+                                 i64.highest
+                                 s.lows
+                                 (iota n)
+                 |> map (\x -> if x == i64.highest then -1 else x)
   in s with arglows = arglows'
-       with is_positive = is_positive'
+
+-- Clears the columns low(j) for all j
+let clear [n] (s: state[n]): state[n] =
+  let lows' = scatter (copy s.lows) s.lows (replicate n (-1))
+  in s with lows = lows'
 
 let phase_2 [n] (s: state[n]): state[n] =
   let can_be_reduced =
@@ -114,9 +100,9 @@ let phase_2 [n] (s: state[n]): state[n] =
   let new_matrix = reduce_step s.matrix s.lows s.arglows s.iteration
 
   let new_lows =
-    -- map (\j -> if can_be_reduced[j] then low new_matrix j else s.lows[j])
-        -- (iota n)
-    map (low new_matrix) (iota n)
+    map (\j -> if can_be_reduced[j] then low new_matrix j else s.lows[j])
+        (iota n)
+    -- map (low new_matrix) (iota n)
 
   -- Identify new pivots and clear
   let is_new_pivot =
@@ -149,7 +135,7 @@ let reset_positives [n] (s: state[n]): state[n] =
   s with is_positive = replicate n false
 
 entry iterate_step [n] (s: state[n]): state[n] =
-  let s = s |> reset_positives |> phase_1 |> clear_positives
+  let s = s |> phase_1 |> clear
             ---|> move_pivots_to_const
             |> reset_positives |> phase_2 |> clear_positives
   in s with iteration = s.iteration + 1
