@@ -8,7 +8,6 @@ type~ state [n] =
   , lows: [n]i64
   , lefts: [n]i64
   , arglows: [n]i64
-  , is_positive: [n]bool
   , iteration: i32
   , debug: i64
   }
@@ -102,42 +101,22 @@ let phase_2 [n] (s: state[n]): state[n] =
   let new_lows =
     map (\j -> if can_be_reduced[j] then low new_matrix j else s.lows[j])
         (iota n)
-    -- map (low new_matrix) (iota n)
 
-  -- Identify new pivots and clear
-  let is_new_pivot =
-    map (\j -> can_be_reduced[j]
-               && new_lows[j] > -1
-               && j == s.lefts[new_lows[j]])
-        (iota n)
-
-  let new_pivot_is = map (\j -> if is_new_pivot[j] then j else -1) (iota n)
-  let new_arglow_is = map (\j -> if j > -1 then new_lows[j] else -1) new_pivot_is
-  let new_arglows = scatter (copy s.arglows) new_arglow_is (iota n)
-
-  let new_positive_is = map (\j -> if can_be_reduced[j] then new_lows[j] else -1) (iota n)
-  let new_is_positive = scatter (copy s.is_positive) new_positive_is (replicate n true)
+  -- Clear low(j) for all non-pivots j that were just changed by the reduction step;
+  -- like the `clear` function, but only for the newly reduced ones
+  let idxs_to_clear = map (\j -> if can_be_reduced[j] then new_lows[j] else -1) (iota n)
+  let new_lows' = scatter (copy new_lows) idxs_to_clear (replicate n (-1))
 
   in s with matrix = new_matrix
-       with lows = new_lows
-       with is_positive = new_is_positive
-       with arglows = new_arglows
-
-let clear_positives [n] (s: state[n]): state[n] =
-  let lows' =
-    map (\j -> if s.is_positive[j] then -1 else s.lows[j]) (iota n)
-  in s with lows = lows'
+       with lows = new_lows'
 
 entry is_reduced [n] (s: state[n]): bool =
   all (\j -> s.lows[j] == -1 || s.arglows[s.lows[j]] == j) (iota n)
 
-let reset_positives [n] (s: state[n]): state[n] =
-  s with is_positive = replicate n false
-
 entry iterate_step [n] (s: state[n]): state[n] =
   let s = s |> phase_1 |> clear
             ---|> move_pivots_to_const
-            |> reset_positives |> phase_2 |> clear_positives
+            |> phase_2
   in s with iteration = s.iteration + 1
 
 entry init_state (col_idxs: []i32) (row_idxs: []i32) (n: i64): state[n] =
@@ -148,7 +127,6 @@ entry init_state (col_idxs: []i32) (row_idxs: []i32) (n: i64): state[n] =
      , lows        = map (low d) (iota n)
      , lefts       = map (left d) (iota n)
      , arglows     = replicate n (-1)
-     , is_positive = replicate n false
      , iteration = 0
      , debug = 0
      }
