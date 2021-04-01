@@ -6,4 +6,6 @@ futhark.pkg
 lib/
 
 notes.txt
+benchmark-notes.txt
 output_lows/
+
