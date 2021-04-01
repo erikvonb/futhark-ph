@@ -96,7 +96,7 @@ let phase_2 [n] (s: state[n]): state[n] =
   let can_be_reduced =
     map (\j -> s.lows[j] != -1 && s.arglows[s.lows[j]] != j) (iota n)
 
-  let new_matrix = reduce_step_merge s.matrix s.lows s.arglows s.iteration
+  let new_matrix = reduce_step s.matrix s.lows s.arglows
 
   let new_lows =
     map (\j -> if can_be_reduced[j] then low new_matrix j else s.lows[j])

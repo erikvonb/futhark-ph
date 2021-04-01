@@ -83,54 +83,7 @@ let csc_to_coo2 (d: csc_mat): [](i32, i32) =
             (\j k -> ( i32.i64 j, d.row_idxs[d.col_offsets[j] + k]))
             (iota n)
 
-let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64)
-                    (iteration: i32): csc_mat =
-  -- Define functions for expansion
-  let col_sizes = init <| map2 (-) (rotate 1 d.col_offsets) d.col_offsets
-  let new_col_size_bound j =
-    -- If d_j is zero
-    if lows[j] == -1
-    then 0
-    -- If d_j has no pivot assigned to it yet, or it is a pivot
-    else if arglows[lows[j]] == -1 || arglows[lows[j]] == j
-    then col_sizes[j]
-    -- If d_j is reducible and we've identified its pivot
-    -- TODO if rows are always sorted, we can immediately remove the low,
-    -- and subtract 2 from this expression
-    else col_sizes[j] + col_sizes[arglows[lows[j]]]
-  let make_coo2_element j j_row =
-    ( i32.i64 j
-    , (get_csc_col d j ++ get_csc_col d arglows[lows[j]])[j_row]
-    -- , let l = csc_col_nnz d j
-      -- in if j_row < l
-         -- then (get_csc_col d j)[j_row]
-         -- else (get_csc_col d arglows[lows[j]])[j_row - l]
-    )
-
-  -- Expand into intermediate COO matrix
-  let coo2 = expand new_col_size_bound make_coo2_element (iota n)
-
-  -- Sort the columns by row index
-  let coo2 = sort_coo2 coo2
-
-  -- Flag the first occurrence of any duplicate
-  let flags = map2 (\(j1,i1) (j2,i2) -> j1 == j2 && i1 == i2)
-                   coo2
-                   (rotate 1 coo2)
-  -- Map all duplicates to -1
-  let coo2 = map2 (\x f -> if f then (x.0, -1) else x) coo2 flags
-  let coo2 = map2 (\x f -> if f then (x.0, -1) else x) coo2 (rotate (-1) flags)
-  let coo2 = filter (\(_,i) -> i != -1) coo2
-  -- let coo2 =
-    -- if iteration % 20 == 0
-      -- then filter (\(_,i) -> i != -1) coo2
-      -- else coo2
-
-  -- Convert back to CSC
-  in coo2_to_csc coo2 n
-
-let reduce_step_merge [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64)
-                          (iteration: i32): csc_mat =
+let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64): csc_mat =
 
   let col_sizes = init <| map2 (-) (rotate 1 d.col_offsets) d.col_offsets
   let will_change = map (\j -> lows[j] != -1 && arglows[lows[j]] != j) (iota n)
@@ -188,8 +141,6 @@ let reduce_step_merge [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64)
                  in (x,y))
           (iota n0)
 
-    let _ = trace i
-    let _ = break 1
       let row_idxs' =
         scatter row_idxs
                 (map (\j -> if i < bounds[j] then offsets[j] + i else -1)
