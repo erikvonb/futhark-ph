@@ -83,9 +83,7 @@ entry is_reduced [n] (s: state[n]): bool =
   all (\j -> s.lows[j] == -1 || s.arglows[s.lows[j]] == j) (iota n)
 
 entry iterate_step [n] (s: state[n]): state[n] =
-  let s = s |> phase_1 |> clear
-            ---|> move_pivots_to_const
-            |> phase_2
+  let s = s |> clear |> phase_1 |> phase_2
   in s with iteration = s.iteration + 1
 
 entry init_state (col_idxs: []i32) (row_idxs: []i32) (n: i64): state[n] =
