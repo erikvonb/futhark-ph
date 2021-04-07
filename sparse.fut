@@ -39,9 +39,9 @@ let sort_coo2 [n] (d: coo2_mat[n]): coo2_mat[n] =
     d
 
 let low (d: csc_mat) (j: i64): i64 =
-  -- TODO if rows are sorted, low is just the last element
-  let i = get_csc_col d j |> i32.maximum |> i64.i32
-  in if i < 0 then -1 else i
+  if csc_col_nnz d j == 0
+    then -1
+    else i64.i32 d.row_idxs[ d.col_offsets[j+1] - 1 ]
 
 let last_occurrence [n] 't (xs: [n]t) (pred: t -> bool): i64 =
   let is = map (\i -> if pred xs[i] then i else -1) (iota n)
