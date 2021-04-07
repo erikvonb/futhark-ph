@@ -73,11 +73,11 @@ let phase_2 [n] (s: state[n]): state[n] =
 
   -- Clear low(j) for all non-pivots j that were just changed by the reduction step;
   -- like the `clear` function, but only for the newly reduced ones
-  let idxs_to_clear = map (\j -> if can_be_reduced[j] then new_lows[j] else -1) (iota n)
-  let new_lows' = scatter (copy new_lows) idxs_to_clear (replicate n (-1))
+  -- let idxs_to_clear = map (\j -> if can_be_reduced[j] then new_lows[j] else -1) (iota n)
+  -- let new_lows' = scatter (copy new_lows) idxs_to_clear (replicate n (-1))
 
   in s with matrix = new_matrix
-       with lows = new_lows'
+       with lows = new_lows
 
 entry is_reduced [n] (s: state[n]): bool =
   all (\j -> s.lows[j] == -1 || s.arglows[s.lows[j]] == j) (iota n)
