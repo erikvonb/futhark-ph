@@ -42,22 +42,7 @@ let low (d: csc_mat) (j: i64): i64 =
   if csc_col_nnz d j == 0
     then -1
     else i64.i32 d.row_idxs[ d.col_offsets[j+1] - 1 ]
-
-let last_occurrence [n] 't (xs: [n]t) (pred: t -> bool): i64 =
-  let is = map (\i -> if pred xs[i] then i else -1) (iota n)
-  in reduce i64.max (-1) is
-
-let first_occurrence [n] 't (xs: [n]t) (pred: t -> bool): i64 =
-  let i = last_occurrence (reverse xs) pred
-  in if i == -1 then -1 else n - 1 - i
   
-let left (d: csc_mat) (i: i64): i64 =
-  let n = length d.col_offsets - 1
-  in (loop (j0, done) = (-1, false) for j < n do
-        if !done && any (== i32.i64 i) (get_csc_col d j)
-          then (j, true) else (j0, done)
-     ).0
-
 let coo2_to_csc [n] (d: coo2_mat[n]) (n_cols: i64): csc_mat =
   let col_idxs = (unzip2 d).0
   let row_idxs = (unzip2 d).1

@@ -44,9 +44,6 @@ type~ state [n] =
 
   -- in s with const_matrix = new_const_matrix
 
-let beta_j (lefts: []i64) (j: i64): i64 =
-  last_occurrence lefts (==j)
-
 let phase_1 [n] (s: state[n]): state[n] =
   let arglows' = reduce_by_index (replicate n i64.highest)
                                  i64.min
