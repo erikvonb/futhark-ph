@@ -99,7 +99,7 @@ let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64): csc_mat =
 
   let new_col_sizes =
     map (\j -> if will_change[j]
-               then col_sizes[j] + col_sizes[arglows[lows[j]]]
+               then col_sizes[j] + col_sizes[arglows[lows[j]]] - 2
                else col_sizes[j])
         (iota n)
 
