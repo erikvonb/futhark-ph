@@ -126,22 +126,22 @@ let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64): csc_mat =
                  in (x,y))
           (iota n0)
 
-      let row_idxs' =
-        scatter row_idxs
-                (map (\j -> if i < bounds[j] then offsets[j] + i else -1)
-                     (iota n0))
-                (map (\j -> let (x,y) = pairs[j]
-                            in if      x < y then x
-                               else if y < x then y
-                               else -1)
-                     (iota n0))
+    let row_idxs' =
+      scatter row_idxs
+              (map (\j -> if i < bounds[j] then offsets[j] + i else -1)
+                   (iota n0))
+              (map (\j -> let (x,y) = pairs[j]
+                          in if      x < y then x
+                             else if y < x then y
+                             else -1)
+                   (iota n0))
                 
-      let (ks', ls') =
-        (iota n0) |> map (\j -> let (x,y) = pairs[j]
-                                in if   x < y then (ks[j]+1, ls[j]  )
-                                else if y < x then (ks[j],   ls[j]+1)
-                                else (ks[j]+1, ls[j]+1))
-                  |> unzip
+    let (ks', ls') =
+      (iota n0) |> map (\j -> let (x,y) = pairs[j]
+                              in if   x < y then (ks[j]+1, ls[j]  )
+                              else if y < x then (ks[j],   ls[j]+1)
+                              else (ks[j]+1, ls[j]+1))
+                |> unzip
 
     in (row_idxs', ks', ls')
 
