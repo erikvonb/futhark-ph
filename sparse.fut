@@ -102,13 +102,8 @@ let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64): csc_mat =
   let pxs = replicate n0 (0: i64)
   let pys = replicate n0 (0: i64)
   let pzs = replicate n0 (0: i64)
-  let offsets =
-    (iota n) |> filter (\j -> will_change[j])
-             |> map (\j -> new_col_offsets[j])
-             :> [n0]i64
-  let bounds =
-    (iota n) |> filter (\j -> will_change[j])
-             |> map (\j -> new_col_lengths_bounds[j])
+  let offsets = map (\j -> new_col_offsets[j]) update_idxs
+  let bounds = map (\j -> new_col_lengths_bounds[j]) update_idxs
 
   let (row_idxs,_,_,pzs_final) = loop (row_idxs, pxs, pys, pzs) for i < i64.maximum bounds do
     let pairs =
