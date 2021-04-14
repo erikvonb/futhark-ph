@@ -2,13 +2,16 @@ import "lib/github.com/diku-dk/sorts/radix_sort"
 import "lib/github.com/diku-dk/segmented/segmented"
 import "sparse"
 
+type debug_t = (i64, i64)
+let debug_ne: debug_t = (0, 0)
+
 type~ state [n] =
   { matrix: csc_mat
   -- , const_matrix: const_mat
   , lows: [n]i64
   , arglows: [n]i64
   , iteration: i32
-  , debug: i64
+  , debug: debug_t
   }
 
 -- let move_pivots_to_const [n] (s: state[n]): state[n] =
@@ -80,8 +83,11 @@ entry is_reduced [n] (s: state[n]): bool =
   all (\j -> s.lows[j] == -1 || s.arglows[s.lows[j]] == j) (iota n)
 
 entry iterate_step [n] (s: state[n]): state[n] =
+  let nnz_space_before = length s.matrix.row_idxs
   let s = s |> clear |> phase_1 |> phase_2
+  let nnz_space_after = length s.matrix.row_idxs
   in s with iteration = s.iteration + 1
+       with debug = (nnz_space_before, nnz_space_after)
 
 entry init_state (col_idxs: []i32) (row_idxs: []i32) (n: i64): state[n] =
   let d = coo2_to_csc (zip col_idxs row_idxs |> sort_coo2) n
@@ -90,12 +96,17 @@ entry init_state (col_idxs: []i32) (row_idxs: []i32) (n: i64): state[n] =
      , lows        = map (low d) (iota n)
      , arglows     = replicate n (-1)
      , iteration = 0
-     , debug = 0
+     , debug = debug_ne
      }
+
+entry reduce_state [n] (s: state[n]): state[n] =
+  loop s while !(is_reduced s) do
+    iterate_step s
 
 entry state_nnz [n] (s: state[n]): i64 =
   -- length <| s.matrix.row_idxs
   s.matrix.row_idxs |> map (\i -> if i > -1 then 1 else 0) |> reduce (+) 0
+  -- i64.sum s.matrix.col_lengths
 
 let count 't (xs: []t) (p: t -> bool): i32 =
   xs |> map (\x -> if p x then 1 else 0) |> reduce (+) 0
@@ -108,12 +119,13 @@ entry state_n_additions_available [n] (s: state[n]): i32 =
 
 entry state_matrix_coo [n] (s: state[n]): ([]i32, []i32) =
   let (col_idxs, row_idxs) = s.matrix |> csc_to_coo2 |> filter (\(_,i) -> i != -1) |> unzip
+  -- let (col_idxs, row_idxs) = s.matrix |> csc_to_coo2 |> unzip
   in (col_idxs, row_idxs)
 
 entry state_lows [n] (s: state[n]): []i64 =
   s.lows
 
-entry state_contents_debug [n] (s: state[n]): i64 = s.debug
+entry state_contents_debug [n] (s: state[n]): (i64, i64) = s.debug
 
 let d0: [][]i32 = transpose
  [[0,0,0,0,0,0,0,0,1,0],

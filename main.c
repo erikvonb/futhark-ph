@@ -107,26 +107,29 @@ int reduce(
   bool converged = false;
   int n_iterations = 0;
   
-  while (!converged) {
-    n_iterations++;
+  futhark_entry_reduce_state(context, &fut_state_out, fut_state_in);
+  fut_state_in = fut_state_out;
+  /*while (!converged) {*/
+    /*n_iterations++;*/
     
-    err = futhark_entry_iterate_step(context, &fut_state_out, fut_state_in);
-    if (handle_error(context, err, "iterate_step")) {
-      return 1;
-    }
-    futhark_entry_is_reduced(context, &converged, fut_state_out);
+    /*err = futhark_entry_iterate_step(context, &fut_state_out, fut_state_in);*/
+    /*if (handle_error(context, err, "iterate_step")) {*/
+      /*return 1;*/
+    /*}*/
+    /*futhark_entry_is_reduced(context, &converged, fut_state_out);*/
 
-    struct futhark_opaque_state* tmp = fut_state_in;
-    fut_state_in = fut_state_out;
-    fut_state_out = tmp;
+    /*struct futhark_opaque_state* tmp = fut_state_in;*/
+    /*fut_state_in = fut_state_out;*/
+    /*fut_state_out = tmp;*/
 
-    // statistics gathering
-    /*int32_t n_additions_available;*/
-    /*int32_t n_zero_cols;*/
-    /*futhark_entry_state_n_additions_available(context, &n_additions_available, fut_state_in);*/
-    /*futhark_entry_state_n_zero_cols(context, &n_zero_cols, fut_state_in);*/
-    /*printf("n adds: %d  n zero cols: %d\n", n_additions_available, n_zero_cols);*/
-  }
+    /*// statistics gathering*/
+    /*[>int64_t nnz_space_before;<]*/
+    /*[>int64_t nnz_space_after;<]*/
+    /*[>futhark_entry_state_contents_debug(context, &nnz_space_before,<]*/
+        /*[>&nnz_space_after, fut_state_in);<]*/
+    /*[>printf("Allocated row_idxs before reduction is %ld, after reduction %ld\n",<]*/
+        /*[>nnz_space_before, nnz_space_after);<]*/
+  /*}*/
 
   printf("Finished reducing after %d iterations\n", n_iterations);
   futhark_context_sync(context);
@@ -172,7 +175,7 @@ int reduce(
 
   printf("Freeing futhark data\n");
   futhark_free_opaque_state(context, fut_state_in);
-  futhark_free_opaque_state(context, fut_state_out);
+  /*futhark_free_opaque_state(context, fut_state_out);*/
   futhark_free_i32_1d(context, fut_col_idxs);
   futhark_free_i32_1d(context, fut_row_idxs);
 

@@ -55,6 +55,10 @@ let coo2_to_csc [n] (d: coo2_mat[n]) (n_cols: i64): csc_mat =
   in { col_offsets = col_offsets, col_lengths = col_lengths, row_idxs = row_idxs }
 
 let csc_to_coo2 (d: csc_mat): [](i32, i32) =
+  -- let n = length d.col_lengths
+  -- in expand (\j -> d.col_lengths[j])
+            -- (\j k -> ( i32.i64 j, d.row_idxs[d.col_offsets[j] + k]))
+            -- (iota n)
   let n = length d.col_offsets - 1
   in expand (\j -> d.col_offsets[j + 1] - d.col_offsets[j])
             (\j k -> ( i32.i64 j, d.row_idxs[d.col_offsets[j] + k]))
@@ -90,6 +94,7 @@ let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64): csc_mat =
     |> unzip
   let row_idxs = scatter row_idxs is as
 
+  -- TODO this comment is outdated.
   -- Merge columns into those that will change.  Let j ∈ update_idxs be the
   -- index of a column in the sum matrix we're about to construct. Then pxs[j]
   -- and pys[j] are the two index pointers used for merging the two columns in
@@ -122,14 +127,13 @@ let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64): csc_mat =
                              else if y < x then y
                              else -1)
                    (iota n0))
-                
+
     let (pxs', pys', pzs') =
       (iota n0) |> map (\j -> let (x,y) = pairs[j]
                               in if x == y  then (pxs[j]+1, pys[j]+1, pzs[j])
                               else if x < y then (pxs[j]+1, pys[j], pzs[j]+1)
                               else               (pxs[j], pys[j]+1, pzs[j]+1))
                 |> unzip3
-
     in (row_idxs', pxs', pys', pzs')
 
   -- Set the final column lengths of the merged columns.
