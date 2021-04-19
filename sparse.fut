@@ -27,9 +27,6 @@ let empty_const_mat (n: i64): const_mat =
 -- (j, i); column index, row index
 type coo2_mat [n] = [n](i32, i32)
 
-let get_csc_col (d: csc_mat) (j: i64): []i32 =
-  d.row_idxs[d.col_offsets[j] : d.col_offsets[j+1]]
-
 let csc_col_nnz (d: csc_mat) (j: i64): i64 =
   d.col_lengths[j]
 
@@ -50,17 +47,13 @@ let coo2_to_csc [n] (d: coo2_mat[n]) (n_cols: i64): csc_mat =
 
   let col_lengths =
     reduce_by_index (replicate n_cols 0) (+) 0 col_idxs (map (const 1) col_idxs)
-  let col_offsets = [0] ++ scan (+) 0 col_lengths
+ let col_offsets = [0] ++ init (scan (+) 0 col_lengths)
 
   in { col_offsets = col_offsets, col_lengths = col_lengths, row_idxs = row_idxs }
 
 let csc_to_coo2 (d: csc_mat): [](i32, i32) =
-  -- let n = length d.col_lengths
-  -- in expand (\j -> d.col_lengths[j])
-            -- (\j k -> ( i32.i64 j, d.row_idxs[d.col_offsets[j] + k]))
-            -- (iota n)
-  let n = length d.col_offsets - 1
-  in expand (\j -> d.col_offsets[j + 1] - d.col_offsets[j])
+  let n = length d.col_lengths
+  in expand (\j -> d.col_lengths[j])
             (\j k -> ( i32.i64 j, d.row_idxs[d.col_offsets[j] + k]))
             (iota n)
 
@@ -150,7 +143,7 @@ let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64): csc_mat =
 -- 0 0 0 1
 -- 0 0 0 0
 let d0: csc_mat =
-  { col_offsets = [0, 0, 0, 2, 4]
+  { col_offsets = [0, 0, 0, 2]
   , col_lengths = [0, 0, 2, 2]
   , row_idxs = [0, 1, 1, 2]
   }
@@ -165,7 +158,7 @@ let d0_arglows: []i64 = [-1, 2, 3, -1]
 -- 0 0 0 0 1
 -- 0 0 0 0 0
 let d1: csc_mat =
-  { col_offsets = [0, 0, 0, 2, 4, 7]
+  { col_offsets = [0, 0, 0, 2, 4]
   , col_lengths = [0, 0, 2, 2, 3]
   , row_idxs = [0, 2, 1, 2, 1, 2, 3]
   }

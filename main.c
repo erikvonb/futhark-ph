@@ -275,5 +275,6 @@ int main(int argc, char *argv[]) {
     write_array(reduced_lows, n, output_file);
     free(reduced_lows);
   }
+  printf("Done\n");
 }
 
