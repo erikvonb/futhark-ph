@@ -47,7 +47,7 @@ let coo2_to_csc [n] (d: coo2_mat[n]) (n_cols: i64): csc_mat =
 
   let col_lengths =
     reduce_by_index (replicate n_cols 0) (+) 0 col_idxs (map (const 1) col_idxs)
- let col_offsets = [0] ++ init (scan (+) 0 col_lengths)
+  let col_offsets = [0] ++ init (scan (+) 0 col_lengths)
 
   in { col_offsets = col_offsets, col_lengths = col_lengths, row_idxs = row_idxs }
 
