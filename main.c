@@ -61,13 +61,6 @@ int reduce(
     int32_t** out_col_idxs, int32_t** out_row_idxs, int64_t** out_lows,
     int64_t* out_nnz) {
 
-  struct timespec start_time;
-  struct timespec end_time;
-  double time_elapsed_s;
-  long time_elapsed_ns;
-
-  timespec_get(&start_time, TIME_UTC);
-
   struct futhark_context_config* config = futhark_context_config_new();
   if (debug) {
     futhark_context_config_set_debugging(config, 1);
@@ -97,12 +90,6 @@ int reduce(
   if (handle_error(context, err, "init_state")) {
     return 1;
   }
-
-  timespec_get(&end_time, TIME_UTC);
-  time_elapsed_s = difftime(end_time.tv_sec, start_time.tv_sec);
-  time_elapsed_ns = end_time.tv_nsec - start_time.tv_nsec;
-  printf("Phase 0 done after %.2fms\n",
-      time_elapsed_s * 1e3 + (float)time_elapsed_ns * 1e-6);
 
   bool converged = false;
   int n_iterations = 0;
@@ -134,12 +121,6 @@ int reduce(
   printf("Finished reducing after %d iterations\n", n_iterations);
   futhark_context_sync(context);
   
-  timespec_get(&end_time, TIME_UTC);
-  time_elapsed_s = difftime(end_time.tv_sec, start_time.tv_sec);
-  time_elapsed_ns = end_time.tv_nsec - start_time.tv_nsec;
-  printf("Main loop done after %.2fms\n",
-      time_elapsed_s * 1e3 + (float)time_elapsed_ns * 1e-6);
-
   int64_t reduced_nnz;
   err = futhark_entry_state_nnz(context, &reduced_nnz, fut_state_in);
   if (handle_error(context, err, "state_nnz")) {
@@ -229,6 +210,13 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
+  struct timespec start_time;
+  struct timespec end_time;
+  double time_elapsed_s;
+  long time_elapsed_ns;
+
+  timespec_get(&start_time, TIME_UTC);
+
   int64_t n;
   int32_t nnz;
   int32_t* row_idxs;
@@ -239,6 +227,14 @@ int main(int argc, char *argv[]) {
   /*printf("Initial matrix is:\n");*/
   /*print_matrix(sparse_to_dense(col_idxs, row_idxs, nnz, n), n);*/
 
+  timespec_get(&end_time, TIME_UTC);
+  time_elapsed_s = difftime(end_time.tv_sec, start_time.tv_sec);
+  time_elapsed_ns = end_time.tv_nsec - start_time.tv_nsec;
+  printf("Read input file in %.2fms\n",
+      time_elapsed_s * 1e3 + (float)time_elapsed_ns * 1e-6);
+
+  timespec_get(&start_time, TIME_UTC);
+
   int64_t reduced_nnz;
   int32_t* reduced_col_idxs;
   int32_t* reduced_row_idxs;
@@ -246,6 +242,12 @@ int main(int argc, char *argv[]) {
 
   int e = reduce(col_idxs, row_idxs, n, nnz, should_write_matrix, debug,
       &reduced_col_idxs, &reduced_row_idxs, &reduced_lows, &reduced_nnz);
+
+  timespec_get(&end_time, TIME_UTC);
+  time_elapsed_s = difftime(end_time.tv_sec, start_time.tv_sec);
+  time_elapsed_ns = end_time.tv_nsec - start_time.tv_nsec;
+  printf("Reduced in %.2fms\n",
+      time_elapsed_s * 1e3 + (float)time_elapsed_ns * 1e-6);
 
   free(col_idxs);
   free(row_idxs);
