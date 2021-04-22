@@ -133,10 +133,9 @@ let add_pairs [n0] (left_right_pairs: [n0](i64, i64)) (d1: csc_mat) (d2: csc_mat
   in d2 with col_lengths = new_col_lengths
         with row_idxs    = row_idxs
 
-let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64): csc_mat =
+let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64) (nonzero_js: []i64): csc_mat =
   let (update_idxs, const_idxs) =
-    (iota n) |> filter (\j -> lows[j] != -1)
-             |> partition (\j -> arglows[lows[j]] != j)
+    partition (\j -> arglows[lows[j]] != j) nonzero_js
 
   -- (j,k) ∈ left_right_pairs iff we should assign d_k <- d_k + d_j,
   -- i.e. column j is to the left of k and we should add j to k.

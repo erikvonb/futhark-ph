@@ -10,6 +10,7 @@ type~ state [n] =
   -- , const_matrix: const_mat
   , lows: [n]i64
   , arglows: [n]i64
+  , nonzero_js: []i64
   , iteration: i32
   , debug: debug_t
   }
@@ -59,47 +60,45 @@ let phase_1 [n] (s: state[n]): state[n] =
 -- Clears the columns low(j) for all j
 let clear [n] (s: state[n]): state[n] =
   let lows' = scatter (copy s.lows) s.lows (replicate n (-1))
+  let nonzero_js' = filter (\j -> lows'[j] != -1) s.nonzero_js
   in s with lows = lows'
+       with nonzero_js = nonzero_js'
 
 let phase_2 [n] (s: state[n]): state[n] =
-  let can_be_reduced =
-    map (\j -> s.lows[j] != -1 && s.arglows[s.lows[j]] != j) (iota n)
-
-  let new_matrix = reduce_step s.matrix s.lows s.arglows
-
+  let new_matrix = reduce_step s.matrix s.lows s.arglows s.nonzero_js
   let new_lows =
-    map (\j -> if can_be_reduced[j] then low new_matrix j else s.lows[j])
-        (iota n)
-
-  -- Clear low(j) for all non-pivots j that were just changed by the reduction step;
-  -- like the `clear` function, but only for the newly reduced ones
-  -- let idxs_to_clear = map (\j -> if can_be_reduced[j] then new_lows[j] else -1) (iota n)
-  -- let new_lows' = scatter (copy new_lows) idxs_to_clear (replicate n (-1))
-
+    scatter (copy s.lows)
+            s.nonzero_js
+            (map (low new_matrix) s.nonzero_js)
   in s with matrix = new_matrix
        with lows   = new_lows
 
 entry is_reduced [n] (s: state[n]): bool =
   all (\j -> s.lows[j] == -1 || s.arglows[s.lows[j]] == j) (iota n)
+  -- all (\j -> s.arglows[s.lows[j]] == j) s.nonzero_js
 
 entry iterate_step [n] (s: state[n]): state[n] =
   let nnz_space_before = length s.matrix.row_idxs
   let s = s |> clear |> phase_1 |> phase_2
+  -- let s = s |> phase_1 |> phase_2 |> clear
   let nnz_space_after = length s.matrix.row_idxs
   in s with iteration = s.iteration + 1
        with debug = (nnz_space_before, nnz_space_after)
 
 entry init_state (col_idxs: []i32) (row_idxs: []i32) (n: i64): state[n] =
   let d = coo2_to_csc (zip col_idxs row_idxs |> sort_coo2) n
+  let lows = tabulate n (low d)
   in { matrix      = d
      -- , const_matrix    = empty_const_mat n
-     , lows        = map (low d) (iota n)
+     , lows        = lows
      , arglows     = replicate n (-1)
+     , nonzero_js = filter (\j -> lows[j] != -1) (iota n)
      , iteration = 0
      , debug = debug_ne
      }
 
 entry reduce_state [n] (s: state[n]): state[n] =
+  -- let s = clear s
   loop s while !(is_reduced s) do
     iterate_step s
 
@@ -182,4 +181,11 @@ let d3_n: i64 = 15
 -- .............11
 -- ...............
 -- ...............
+
+let d4_rs: []i32 =
+  [16,24,21,23,18,9,26,28,13,21,29,1,0,2,6,8,7,12,1,3,19,10,18,22,19,12,4,3,22,7,26,2,0,30,24,15,29,1,6,11,7,9,14,16,13,15,5,4,11,22,18,3,0,8,19,26,6,0,14,28,30,23,2,1,8,10,9,11,10,12,2,3,6,3]
+let d4_cs: []i32 =
+  [25,25,25,25,28,28,28,31,31,31,31,9,9,12,12,15,15,15,18,18,21,21,21,24,24,24,27,27,30,30,30,8,8,33,33,33,33,11,11,14,14,14,17,17,17,17,20,20,23,23,23,26,26,29,29,29,7,7,32,32,32,32,10,10,13,13,13,16,16,16,19,19,22,22]
+let d4_n: i64 = 34
+
 
