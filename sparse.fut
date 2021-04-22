@@ -98,34 +98,32 @@ let add_pairs [n0] (left_right_pairs: [n0](i64, i64)) (d1: csc_mat) (d2: csc_mat
   let bounds = map (\j -> d2.col_lengths[j]) update_idxs
   let row_idxs = copy d2.row_idxs
 
+  let get_elem_in_col (col_idx: i64) (nnz_idx: i64): i32 =
+    if nnz_idx < d1.col_lengths[col_idx]
+    then d1.row_idxs[d1.col_offsets[col_idx] + nnz_idx]
+    else i32.highest
+
   let (row_idxs,_,_,pzs_final) = loop (row_idxs, pxs, pys, pzs) for i < i64.maximum bounds do
-    let pairs =
-      tabulate n0 (\j ->
-        let (u,v) = left_right_pairs[j]
-        let x = if pxs[j] < d1.col_lengths[u]
-                then d1.row_idxs[d1.col_offsets[u] + pxs[j]]
-                else i32.highest
-        let y = if pys[j] < d1.col_lengths[v]
-                then d1.row_idxs[d1.col_offsets[v] + pys[j]]
-                else i32.highest
-        in (x,y))
+    let xs = tabulate n0 <| \j ->
+      get_elem_in_col left_right_pairs[j].0 pxs[j]
+    let ys = tabulate n0 <| \j ->
+      get_elem_in_col left_right_pairs[j].1 pys[j]
 
     let row_idxs' =
       scatter row_idxs
-              (tabulate n0 (\j -> if i < bounds[j]
-                                 then offsets[j] + pzs[j]
-                                 else -1))
-              (tabulate n0 (\j -> let (x,y) = pairs[j]
-                                 in   if x < y then x
-                                 else if y < x then y
-                                 else -1))
+              (tabulate n0 <| \j -> if i < bounds[j]
+                                    then offsets[j] + pzs[j]
+                                    else -1)
+              (tabulate n0 <| \j -> if xs[j] < ys[j] then xs[j]
+                                    else if ys[j] < xs[j] then ys[j]
+                                    else -1)
 
     let (pxs', pys', pzs') =
-      (iota n0) |> map (\j -> let (x,y) = pairs[j]
-                              in if x == y  then (pxs[j]+1, pys[j]+1, pzs[j])
-                              else if x < y then (pxs[j]+1, pys[j], pzs[j]+1)
-                              else               (pxs[j], pys[j]+1, pzs[j]+1))
+      tabulate n0 (\j -> if xs[j] == ys[j]     then (pxs[j]+1, pys[j]+1, pzs[j])
+                         else if xs[j] < ys[j] then (pxs[j]+1, pys[j], pzs[j]+1)
+                         else                       (pxs[j], pys[j]+1, pzs[j]+1))
                 |> unzip3
+
     in (row_idxs', pxs', pys', pzs')
 
   -- Set the final column lengths of the merged columns.
