@@ -85,9 +85,7 @@ let copy_columns (js: []i64) (d1: csc_mat) (d2: csc_mat): csc_mat =
   -- The non-changing columns should have been allocated exactly their size, so
   -- the maximum column length that was set in `init_new_matrix` will be
   -- correct.
-  -- let new_col_lengths = scatter (copy d2.col_lengths) js (map (\j -> d1.col_lengths[j]) js)
   in d2 with row_idxs = new_row_idxs
-        -- with col_lengths = new_col_lengths
   
 let add_pairs [n0] (left_right_pairs: [n0](i64, i64)) (d1: csc_mat) (d2: csc_mat): csc_mat =
   let update_idxs = (unzip left_right_pairs).1
@@ -102,21 +100,25 @@ let add_pairs [n0] (left_right_pairs: [n0](i64, i64)) (d1: csc_mat) (d2: csc_mat
 
   let (row_idxs,_,_,pzs_final) = loop (row_idxs, pxs, pys, pzs) for i < i64.maximum bounds do
     let pairs =
-      map (\j -> let (u,v) = left_right_pairs[j]
-                 let x = if pxs[j] < d1.col_lengths[u] then d1.row_idxs[d1.col_offsets[u] + pxs[j]] else i32.highest
-                 let y = if pys[j] < d1.col_lengths[v] then d1.row_idxs[d1.col_offsets[v] + pys[j]] else i32.highest
-                 in (x,y))
-          (iota n0)
+      tabulate n0 (\j ->
+        let (u,v) = left_right_pairs[j]
+        let x = if pxs[j] < d1.col_lengths[u]
+                then d1.row_idxs[d1.col_offsets[u] + pxs[j]]
+                else i32.highest
+        let y = if pys[j] < d1.col_lengths[v]
+                then d1.row_idxs[d1.col_offsets[v] + pys[j]]
+                else i32.highest
+        in (x,y))
 
     let row_idxs' =
       scatter row_idxs
-              (map (\j -> if i < bounds[j] then offsets[j] + pzs[j] else -1)
-                   (iota n0))
-              (map (\j -> let (x,y) = pairs[j]
-                          in if      x < y then x
-                             else if y < x then y
-                             else -1)
-                   (iota n0))
+              (tabulate n0 (\j -> if i < bounds[j]
+                                 then offsets[j] + pzs[j]
+                                 else -1))
+              (tabulate n0 (\j -> let (x,y) = pairs[j]
+                                 in   if x < y then x
+                                 else if y < x then y
+                                 else -1))
 
     let (pxs', pys', pzs') =
       (iota n0) |> map (\j -> let (x,y) = pairs[j]
