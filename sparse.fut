@@ -61,12 +61,12 @@ let csc_to_coo2 (d: csc_mat): [](i32, i32) =
 -- that there is guaranteed space for all new columns after one iteration of
 -- reduction.  Sets column lengths to the maximum possible. Does not set any
 -- row indices.
-let init_new_matrix [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64): csc_mat =
+let init_new_matrix (d: csc_mat) (left_right_pairs: [](i64, i64)): csc_mat =
   let new_col_lengths_bounds =
-    tabulate n (\j ->
-      if lows[j] != -1 && arglows[lows[j]] != j
-      then d.col_lengths[j] + d.col_lengths[arglows[lows[j]]] - 2
-      else d.col_lengths[j])
+    scatter (copy d.col_lengths)
+            (unzip left_right_pairs).1
+            (map (\(k,j) -> d.col_lengths[k] + d.col_lengths[j] - 2)
+                 left_right_pairs)
   let new_col_offsets = [0] ++ init (scan (+) 0 new_col_lengths_bounds)
   let new_row_idxs = replicate (i64.sum new_col_lengths_bounds) (-1)
   in { col_offsets = new_col_offsets
@@ -142,7 +142,7 @@ let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64) (nonzero_js: [
   let left_right_pairs =
     map (\j -> (arglows[lows[j]], j)) update_idxs
 
-  let new_matrix = init_new_matrix d lows arglows
+  let new_matrix = init_new_matrix d left_right_pairs
                    |> copy_columns const_idxs d
                    |> add_pairs left_right_pairs d
 
