@@ -77,7 +77,7 @@ let phase_2 [n] (s: state[n]): state[n] =
   -- let new_lows' = scatter (copy new_lows) idxs_to_clear (replicate n (-1))
 
   in s with matrix = new_matrix
-       with lows = new_lows
+       with lows   = new_lows
 
 entry is_reduced [n] (s: state[n]): bool =
   all (\j -> s.lows[j] == -1 || s.arglows[s.lows[j]] == j) (iota n)

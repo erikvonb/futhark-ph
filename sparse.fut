@@ -57,57 +57,54 @@ let csc_to_coo2 (d: csc_mat): [](i32, i32) =
             (\j k -> ( i32.i64 j, d.row_idxs[d.col_offsets[j] + k]))
             (iota n)
 
-let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64): csc_mat =
-
-  let will_change = map (\j -> lows[j] != -1 && arglows[lows[j]] != j) (iota n)
-  
-  let (update_idxs, const_idxs) =
-    (iota n) |> filter (\j -> lows[j] != -1)
-             |> partition (\j -> will_change[j])
-
-  -- (j,k) ∈ left_right_pairs iff we should assign d_k <- d_k + d_j,
-  -- i.e. column j is to the left of k and we should add j to k.
-  let left_right_pairs =
-    map (\j -> (arglows[lows[j]], j)) update_idxs
-
+-- Creates a new CSC matrix, initialising all arrays and settings offsets such
+-- that there is guaranteed space for all new columns after one iteration of
+-- reduction.  Sets column lengths to the maximum possible. Does not set any
+-- row indices.
+let init_new_matrix [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64): csc_mat =
   let new_col_lengths_bounds =
-    map (\j -> if will_change[j]
-               then d.col_lengths[j] + d.col_lengths[arglows[lows[j]]] - 2
-               else d.col_lengths[j])
-        (iota n)
+    tabulate n (\j ->
+      if lows[j] != -1 && arglows[lows[j]] != j
+      then d.col_lengths[j] + d.col_lengths[arglows[lows[j]]] - 2
+      else d.col_lengths[j])
+  let new_col_offsets = [0] ++ init (scan (+) 0 new_col_lengths_bounds)
+  let new_row_idxs = replicate (i64.sum new_col_lengths_bounds) (-1)
+  in { col_offsets = new_col_offsets
+     , col_lengths = new_col_lengths_bounds
+     , row_idxs    = new_row_idxs
+     }
 
-  let new_col_offsets = [0] ++ scan (+) 0 new_col_lengths_bounds
-  let row_idxs = replicate (i64.sum new_col_lengths_bounds) (-1)
-
-  -- Copy the columns that will not change.
+-- TODO we can avoid the copy in scatter by moving this into init_new_matrix
+let copy_columns (js: []i64) (d1: csc_mat) (d2: csc_mat): csc_mat =
   let (is, as) =
-    expand (\j -> d.col_lengths[j])
-           (\j k -> (new_col_offsets[j] + k, d.row_idxs[d.col_offsets[j] + k]))
-           const_idxs
+    expand (\j -> d1.col_lengths[j])
+           (\j k -> (d2.col_offsets[j] + k, d1.row_idxs[d1.col_offsets[j] + k]))
+           js
     |> unzip
-  let row_idxs = scatter row_idxs is as
-
-  -- TODO this comment is outdated.
-  -- Merge columns into those that will change.  Let j ∈ update_idxs be the
-  -- index of a column in the sum matrix we're about to construct. Then pxs[j]
-  -- and pys[j] are the two index pointers used for merging the two columns in
-  -- left_right_pairs[j]; If left_right_pairs[j] = (u,v), then pxs[j] is the
-  -- index of the next value in column u to be merged and pys[j] the next value
-  -- in column v to be merged. Further, offsets[j] is the column offset of
-  -- column j into the final CSC matrix. From the code above, bounds[j] is the
-  -- size allocated to column j in the final matrix.
-  let n0 = length left_right_pairs
+  let new_row_idxs = scatter (copy d2.row_idxs) is as
+  -- The non-changing columns should have been allocated exactly their size, so
+  -- the maximum column length that was set in `init_new_matrix` will be
+  -- correct.
+  -- let new_col_lengths = scatter (copy d2.col_lengths) js (map (\j -> d1.col_lengths[j]) js)
+  in d2 with row_idxs = new_row_idxs
+        -- with col_lengths = new_col_lengths
+  
+let add_pairs [n0] (left_right_pairs: [n0](i64, i64)) (d1: csc_mat) (d2: csc_mat): csc_mat =
+  let update_idxs = (unzip left_right_pairs).1
   let pxs = replicate n0 (0: i64)
   let pys = replicate n0 (0: i64)
   let pzs = replicate n0 (0: i64)
-  let offsets = map (\j -> new_col_offsets[j]) update_idxs
-  let bounds = map (\j -> new_col_lengths_bounds[j]) update_idxs
+  let offsets = map (\j -> d2.col_offsets[j]) update_idxs
+  -- At this point `d2.col_lengths` should be the maximum possible, i.e. the
+  -- upper bound of the column length.
+  let bounds = map (\j -> d2.col_lengths[j]) update_idxs
+  let row_idxs = copy d2.row_idxs
 
   let (row_idxs,_,_,pzs_final) = loop (row_idxs, pxs, pys, pzs) for i < i64.maximum bounds do
     let pairs =
       map (\j -> let (u,v) = left_right_pairs[j]
-                 let x = if pxs[j] < d.col_lengths[u] then d.row_idxs[d.col_offsets[u] + pxs[j]] else i32.highest
-                 let y = if pys[j] < d.col_lengths[v] then d.row_idxs[d.col_offsets[v] + pys[j]] else i32.highest
+                 let x = if pxs[j] < d1.col_lengths[u] then d1.row_idxs[d1.col_offsets[u] + pxs[j]] else i32.highest
+                 let y = if pys[j] < d1.col_lengths[v] then d1.row_idxs[d1.col_offsets[v] + pys[j]] else i32.highest
                  in (x,y))
           (iota n0)
 
@@ -131,12 +128,26 @@ let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64): csc_mat =
 
   -- Set the final column lengths of the merged columns.
   let new_col_lengths =
-    scatter (copy d.col_lengths) (update_idxs :> [n0]i64) pzs_final
+    scatter (copy d2.col_lengths) (update_idxs :> [n0]i64) pzs_final
 
-  in { col_offsets = new_col_offsets
-     , col_lengths = new_col_lengths
-     , row_idxs = row_idxs
-     }
+  in d2 with col_lengths = new_col_lengths
+        with row_idxs    = row_idxs
+
+let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64): csc_mat =
+  let (update_idxs, const_idxs) =
+    (iota n) |> filter (\j -> lows[j] != -1)
+             |> partition (\j -> arglows[lows[j]] != j)
+
+  -- (j,k) ∈ left_right_pairs iff we should assign d_k <- d_k + d_j,
+  -- i.e. column j is to the left of k and we should add j to k.
+  let left_right_pairs =
+    map (\j -> (arglows[lows[j]], j)) update_idxs
+
+  let new_matrix = init_new_matrix d lows arglows
+                   |> copy_columns const_idxs d
+                   |> add_pairs left_right_pairs d
+
+  in new_matrix
 
 -- 0 0 1 0
 -- 0 0 1 1
