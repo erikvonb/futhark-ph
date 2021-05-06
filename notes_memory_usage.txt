@@ -1,0 +1,24 @@
+the largest reduction has:
+2315794 row_idxs in the input matrix, and allocates 2357354 for the
+output row_idxs, for a total of 4673148 elements.
+
+
+Input matrix:
+360 293 columns -- col_offsets []i64 and col_lengths []i64
+2 315 794 row_idxs []i32
+----------------
+360 293 * 2 * 64 + 2 315 794 * 32 = 120 222 912 bytes = 120 MB
+
+Output matrix:
+360 293 columns
+2 357 354 row_idxs
+---------------
+360 293 * 2 * 64 + 2 357 354 * 32 = 121 552 832 bytes = 121 MB
+
+
+
+
+--- Loop using mostly map, not scatter, doing the loop in Futhakr ----
+Klein with diam 2, 1.5 million columns, has peak allocation of 489 MB in profiling log, but nvidia-smi shows max usage of about 1.4 or 1.8 GB
+
+

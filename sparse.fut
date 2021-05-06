@@ -5,23 +5,6 @@ type~ csc_mat =
   { col_offsets: []i64
   , col_lengths: []i64
   , row_idxs: []i32
-  -- , values: []i32
-  }
-
--- Append-only matrix type, for storing the reduced columns
-type~ const_mat =
-  { col_offsets: []i64
-  , row_idxs: []i32
-  -- Could be a hash map?
-  , col_idx_map: []i64
-  , map_ptr: i64
-  }
-
-let empty_const_mat (n: i64): const_mat =
-  { col_offsets = [0]
-  , row_idxs = []
-  , col_idx_map = replicate n (-1)
-  , map_ptr = 0
   }
 
 -- (j, i); column index, row index

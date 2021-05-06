@@ -1,0 +1,2 @@
+command,mean,stddev,median,user,system,min,max
+./main -o tmplows -i ../datasets/sparse/klein_bottle_pointcloud_new_400_diam_1.3_nnz_234356.txt ,0.358940008515,0.01754344541461844,0.35463780921500004,0.23851962000000002,0.09133274499999998,0.34241475871500004,0.402886803715

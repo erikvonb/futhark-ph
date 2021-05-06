@@ -15,39 +15,6 @@ type~ state [n] =
   , debug: debug_t
   }
 
--- let move_pivots_to_const [n] (s: state[n]): state[n] =
-  -- -- TODO these should only be drawn from the indices of the non-constant matrix
-  -- let pivot_idxs =
-    -- (iota n)
-    -- -- Keep index j only if it is nonempty in the dynamic matrix and a pivot
-    ---|> map (\j -> if s.lows[j] != -1
-                     -- && s.arglows[s.lows[j]] == j then j else -1)
-    ---|> filter (> -1)
-
-  -- let new_const_col_offsets =
-    -- pivot_idxs
-    ---|> map (csc_col_nnz s.matrix)
-    ---|> scan (+) 0
-    ---|> map (+ last s.const_matrix.col_offsets)
-
-  -- let new_const_row_idxs =
-    -- expand (csc_col_nnz s.matrix)
-           -- (\j k -> s.matrix.row_idxs[s.matrix.col_offsets[j] + k])
-           -- pivot_idxs
-
-  -- let new_const_col_idx_map =
-    -- scatter (copy s.const_matrix.col_idx_map)
-            -- pivot_idxs
-            -- (map (+ s.const_matrix.map_ptr) (indices pivot_idxs))
-
-  -- let new_const_matrix =
-    -- s.const_matrix with col_offsets = s.const_matrix.col_offsets ++ new_const_col_offsets
-                   -- with row_idxs = s.const_matrix.row_idxs ++ new_const_row_idxs
-                   -- with col_idx_map = new_const_col_idx_map
-                   -- with map_ptr = s.const_matrix.map_ptr + length pivot_idxs
-
-  -- in s with const_matrix = new_const_matrix
-
 let phase_1 [n] (s: state[n]): state[n] =
   let arglows' = reduce_by_index (replicate n i64.highest)
                                  i64.min
@@ -75,12 +42,10 @@ let phase_2 [n] (s: state[n]): state[n] =
 
 entry is_reduced [n] (s: state[n]): bool =
   all (\j -> s.lows[j] == -1 || s.arglows[s.lows[j]] == j) (iota n)
-  -- all (\j -> s.arglows[s.lows[j]] == j) s.nonzero_js
 
 entry iterate_step [n] (s: state[n]): state[n] =
   let nnz_space_before = length s.matrix.row_idxs
   let s = s |> clear |> phase_1 |> phase_2
-  -- let s = s |> phase_1 |> phase_2 |> clear
   let nnz_space_after = length s.matrix.row_idxs
   in s with iteration = s.iteration + 1
        with debug = (nnz_space_before, nnz_space_after)
@@ -89,7 +54,6 @@ entry init_state (col_idxs: []i32) (row_idxs: []i32) (n: i64): state[n] =
   let d = coo2_to_csc (zip col_idxs row_idxs |> sort_coo2) n
   let lows = tabulate n (low d)
   in { matrix      = d
-     -- , const_matrix    = empty_const_mat n
      , lows        = lows
      , arglows     = replicate n (-1)
      , nonzero_js = filter (\j -> lows[j] != -1) (iota n)
@@ -98,14 +62,11 @@ entry init_state (col_idxs: []i32) (row_idxs: []i32) (n: i64): state[n] =
      }
 
 entry reduce_state [n] (s: state[n]): state[n] =
-  -- let s = clear s
   loop s while !(is_reduced s) do
     iterate_step s
 
 entry state_nnz [n] (s: state[n]): i64 =
-  -- length <| s.matrix.row_idxs
   s.matrix.row_idxs |> map (\i -> if i > -1 then 1 else 0) |> reduce (+) 0
-  -- i64.sum s.matrix.col_lengths
 
 let count 't (xs: []t) (p: t -> bool): i32 =
   xs |> map (\x -> if p x then 1 else 0) |> reduce (+) 0
@@ -118,7 +79,6 @@ entry state_n_additions_available [n] (s: state[n]): i32 =
 
 entry state_matrix_coo [n] (s: state[n]): ([]i32, []i32) =
   let (col_idxs, row_idxs) = s.matrix |> csc_to_coo2 |> filter (\(_,i) -> i != -1) |> unzip
-  -- let (col_idxs, row_idxs) = s.matrix |> csc_to_coo2 |> unzip
   in (col_idxs, row_idxs)
 
 entry state_lows [n] (s: state[n]): []i64 =
