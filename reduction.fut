@@ -68,7 +68,8 @@ entry persistence_intervals [n] [nnz] (col_idxs: [nnz]i32) (lows: [n]i64)
                     (+)
                     0
                     (map i64.i32 col_idxs)
-                    (replicate nnz 1)
+                    (map (const 1) col_idxs)
+    |> map (\x -> if x > 0 then x - 1 else 0)
 
   let finite_ints =
     map (\j -> [ dims[lows[j]], lows[j], j ]) nonzero_js

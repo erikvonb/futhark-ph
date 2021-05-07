@@ -68,7 +68,11 @@ let copy_columns (js: []i64) (d1: csc_mat) (d2: csc_mat): csc_mat =
   -- the maximum column length that was set in `init_new_matrix` will be
   -- correct.
   in d2 with row_idxs = new_row_idxs
-  
+
+let scatter' 't [n] (dest: *[n]t) (i_v_pairs: [](i64, t)): *[n]t =
+  let (is, vs) = unzip i_v_pairs
+  in scatter dest is vs
+
 let add_pairs [n0] (left_right_pairs: [n0](i64, i64)) (d1: csc_mat) (d2: csc_mat): csc_mat =
   let update_idxs = (unzip left_right_pairs).1
   let pxs = replicate n0 (0: i64)
@@ -80,9 +84,9 @@ let add_pairs [n0] (left_right_pairs: [n0](i64, i64)) (d1: csc_mat) (d2: csc_mat
   let bounds = map (\j -> d2.col_lengths[j]) update_idxs
   let row_idxs = copy d2.row_idxs
 
-  let get_elem_in_col (col_idx: i64) (nnz_idx: i64): i32 =
-    if nnz_idx < d1.col_lengths[col_idx]
-    then d1.row_idxs[d1.col_offsets[col_idx] + nnz_idx]
+  let get_elem_in_col (col_idx: i64) (nz_idx: i64): i32 =
+    if nz_idx < d1.col_lengths[col_idx]
+    then d1.row_idxs[d1.col_offsets[col_idx] + nz_idx]
     else i32.highest
 
   let (row_idxs,_,_,pzs_final) = loop (row_idxs, pxs, pys, pzs) for i < i64.maximum bounds do
@@ -91,14 +95,12 @@ let add_pairs [n0] (left_right_pairs: [n0](i64, i64)) (d1: csc_mat) (d2: csc_mat
     let ys = tabulate n0 <| \j ->
       get_elem_in_col left_right_pairs[j].1 pys[j]
 
-    let row_idxs' =
-      scatter row_idxs
-              (tabulate n0 <| \j -> if i < bounds[j]
-                                    then offsets[j] + pzs[j]
-                                    else -1)
-              (tabulate n0 <| \j -> if xs[j] < ys[j] then xs[j]
-                                    else if ys[j] < xs[j] then ys[j]
-                                    else -1)
+    let row_idxs' = scatter' row_idxs (tabulate n0 <| \k ->
+      if bounds[k] <= i
+      then (-1, -1)
+      else let idx = offsets[k] + pzs[k]
+           let v   = if xs[k] == ys[k] then -1 else i32.min xs[k] ys[k]
+           in (idx, v))
 
     let (pxs', pys', pzs') =
       tabulate n0 (\j -> if xs[j] == ys[j]     then (pxs[j]+1, pys[j]+1, pzs[j])
