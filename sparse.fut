@@ -89,24 +89,39 @@ let add_pairs [n0] (left_right_pairs: [n0](i64, i64)) (d1: csc_mat) (d2: csc_mat
     then d1.row_idxs[d1.col_offsets[col_idx] + nz_idx]
     else i32.highest
 
-  let (row_idxs,_,_,pzs_final) = loop (row_idxs, pxs, pys, pzs) for i < i64.maximum bounds do
-    let xs = tabulate n0 <| \j ->
-      get_elem_in_col left_right_pairs[j].0 pxs[j]
-    let ys = tabulate n0 <| \j ->
-      get_elem_in_col left_right_pairs[j].1 pys[j]
-
-    let row_idxs' = scatter' row_idxs (tabulate n0 <| \k ->
+  let update_row_idxs [m] (i: i64)
+                          (row_idxs: *[m]i32)
+                          (pzs: [n0]i64)
+                          (xs: [n0]i32)
+                          (ys: [n0]i32)
+                        : *[m]i32 =
+    scatter' row_idxs (tabulate n0 <| \k ->
       if bounds[k] <= i
       then (-1, -1)
       else let idx = offsets[k] + pzs[k]
            let v   = if xs[k] == ys[k] then -1 else i32.min xs[k] ys[k]
            in (idx, v))
 
-    let (pxs', pys', pzs') =
-      tabulate n0 (\j -> if xs[j] == ys[j]     then (pxs[j]+1, pys[j]+1, pzs[j])
-                         else if xs[j] < ys[j] then (pxs[j]+1, pys[j], pzs[j]+1)
-                         else                       (pxs[j], pys[j]+1, pzs[j]+1))
-                |> unzip3
+  let advance_pointers (pxs: [n0]i64)
+                       (pys: [n0]i64)
+                       (pzs: [n0]i64)
+                       (xs: [n0]i32)
+                       (ys: [n0]i32)
+                     : ([n0]i64, [n0]i64, [n0]i64) =
+    tabulate n0 (\j -> if xs[j] == ys[j]     then (pxs[j]+1, pys[j]+1, pzs[j])
+                       else if xs[j] < ys[j] then (pxs[j]+1, pys[j], pzs[j]+1)
+                       else                       (pxs[j], pys[j]+1, pzs[j]+1))
+    |> unzip3
+
+  let (row_idxs,_,_,pzs_final) = loop (row_idxs, pxs, pys, pzs) for i < i64.maximum bounds do
+    let xs = tabulate n0 <| \j ->
+      get_elem_in_col left_right_pairs[j].0 pxs[j]
+    let ys = tabulate n0 <| \j ->
+      get_elem_in_col left_right_pairs[j].1 pys[j]
+
+    let row_idxs' = update_row_idxs i row_idxs pzs xs ys
+
+    let (pxs', pys', pzs') = advance_pointers pxs pys pzs xs ys
 
     in (row_idxs', pxs', pys', pzs')
 
