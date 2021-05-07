@@ -25,7 +25,6 @@ let update_lookup [n] (s: state[n]): state[n] =
                                  i64.highest
                                  s.lows
                                  (iota n)
-                 |> map (\x -> if x == i64.highest then -1 else x)
   in s with arglows = arglows'
 
 let add_columns [n] (s: state[n]): state[n] =
