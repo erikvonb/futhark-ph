@@ -13,7 +13,13 @@ type~ state [n] =
   , nonzero_js: []i64
   }
 
-let phase_1 [n] (s: state[n]): state[n] =
+let clear [n] (s: state[n]): state[n] =
+  let lows' = scatter (copy s.lows) s.lows (replicate n (-1))
+  let nonzero_js' = filter (\j -> lows'[j] != -1) s.nonzero_js
+  in s with lows = lows'
+       with nonzero_js = nonzero_js'
+
+let update_lookup [n] (s: state[n]): state[n] =
   let arglows' = reduce_by_index (replicate n i64.highest)
                                  i64.min
                                  i64.highest
@@ -22,14 +28,7 @@ let phase_1 [n] (s: state[n]): state[n] =
                  |> map (\x -> if x == i64.highest then -1 else x)
   in s with arglows = arglows'
 
--- Clears the columns low(j) for all j
-let clear [n] (s: state[n]): state[n] =
-  let lows' = scatter (copy s.lows) s.lows (replicate n (-1))
-  let nonzero_js' = filter (\j -> lows'[j] != -1) s.nonzero_js
-  in s with lows = lows'
-       with nonzero_js = nonzero_js'
-
-let phase_2 [n] (s: state[n]): state[n] =
+let add_columns [n] (s: state[n]): state[n] =
   let new_matrix = reduce_step s.matrix s.lows s.arglows s.nonzero_js
   let new_lows =
     scatter (copy s.lows)
@@ -42,7 +41,7 @@ entry is_reduced [n] (s: state[n]): bool =
   all (\j -> s.lows[j] == -1 || s.arglows[s.lows[j]] == j) (iota n)
 
 entry iterate_step [n] (s: state[n]): state[n] =
-  s |> clear |> phase_1 |> phase_2
+  s |> clear |> update_lookup |> add_columns
 
 entry init_state (col_idxs: []i32) (row_idxs: []i32) (n: i64): state[n] =
   let d = coo2_to_csc (zip col_idxs row_idxs |> sort_coo2) n
