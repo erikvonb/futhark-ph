@@ -110,4 +110,17 @@ void write_array(int64_t* array, int n, char* filename) {
   fclose(fp);
 }
 
+void write_intervals(int64_t* intervals, int n, char* filename) {
+  FILE* fp = fopen(filename, "w");
+  if (fp == NULL) {
+    printf("Failed to open file %s\n", filename);
+    return;
+  }
+
+  for (size_t i = 0; i < n; i++) {
+    fprintf(fp, "%ld %ld %ld\n", intervals[3*i], intervals[3*i + 1],
+        intervals[3*i + 2]);
+  }
+  fclose(fp);
+}
 

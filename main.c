@@ -57,9 +57,8 @@ bool handle_error(struct futhark_context *ctx, int e, char* entry_name) {
 
 int reduce(
     int32_t* col_idxs, int32_t* row_idxs, int64_t n, int nnz,
-    bool should_write_matrix, bool debug,
-    int32_t** out_col_idxs, int32_t** out_row_idxs, int64_t** out_lows,
-    int64_t* out_nnz) {
+    bool should_write_matrix, bool should_write_intervals, bool debug,
+    char* output_file) {
 
   struct futhark_context_config* config = futhark_context_config_new();
   if (debug) {
@@ -96,27 +95,6 @@ int reduce(
   
   futhark_entry_reduce_state(context, &fut_state_out, fut_state_in);
   fut_state_in = fut_state_out;
-  /*while (!converged) {*/
-    /*n_iterations++;*/
-    
-    /*err = futhark_entry_iterate_step(context, &fut_state_out, fut_state_in);*/
-    /*if (handle_error(context, err, "iterate_step")) {*/
-      /*return 1;*/
-    /*}*/
-    /*futhark_entry_is_reduced(context, &converged, fut_state_out);*/
-
-    /*struct futhark_opaque_state* tmp = fut_state_in;*/
-    /*fut_state_in = fut_state_out;*/
-    /*fut_state_out = tmp;*/
-
-    /*// statistics gathering*/
-    /*[>int64_t nnz_space_before;<]*/
-    /*[>int64_t nnz_space_after;<]*/
-    /*[>futhark_entry_state_contents_debug(context, &nnz_space_before,<]*/
-        /*[>&nnz_space_after, fut_state_in);<]*/
-    /*[>printf("Allocated row_idxs before reduction is %ld, after reduction %ld\n",<]*/
-        /*[>nnz_space_before, nnz_space_after);<]*/
-  /*}*/
 
   printf("Finished reducing after %d iterations\n", n_iterations);
   futhark_context_sync(context);
@@ -132,47 +110,69 @@ int reduce(
   struct futhark_i32_1d* fut_reduced_col_idxs;
   struct futhark_i32_1d* fut_reduced_row_idxs;
   struct futhark_i64_1d* fut_reduced_lows;
-  int32_t* reduced_col_idxs = malloc(reduced_nnz * sizeof(int32_t));
-  int32_t* reduced_row_idxs = malloc(reduced_nnz * sizeof(int32_t));
-  int64_t* reduced_lows = malloc(n * sizeof(int64_t));
 
+  futhark_entry_state_lows(context, &fut_reduced_lows, fut_state_in);
   printf("Copying to host...\n");
 
   if (should_write_matrix) {
+    // Write the full (dense) reduced matrix to file.
+    int32_t* reduced_col_idxs = malloc(reduced_nnz * sizeof(int32_t));
+    int32_t* reduced_row_idxs = malloc(reduced_nnz * sizeof(int32_t));
+
     futhark_entry_state_matrix_coo(context,
         &fut_reduced_col_idxs, &fut_reduced_row_idxs, fut_state_in);
+
     futhark_context_sync(context);
     futhark_values_i32_1d(context, fut_reduced_col_idxs, reduced_col_idxs);
     futhark_values_i32_1d(context, fut_reduced_row_idxs, reduced_row_idxs);
     futhark_free_i32_1d(context, fut_reduced_col_idxs);
     futhark_free_i32_1d(context, fut_reduced_row_idxs);
 
+    int32_t* reduced_dense_matrix =
+      sparse_to_dense(reduced_col_idxs, reduced_row_idxs, reduced_nnz, n);
+
+    printf("Writing matrix to file\n");
+    write_dense_matrix(reduced_dense_matrix, n, output_file);
+    
+    free(reduced_dense_matrix);
+    free(reduced_col_idxs);
+    free(reduced_row_idxs);
+
+  } else if (should_write_intervals) {
+    // Compute and write the persistence intervals to file.
+    struct futhark_i64_2d* fut_intervals;
+    futhark_entry_persistence_intervals(context, &fut_intervals, fut_col_idxs,
+        fut_reduced_lows);
+    const int64_t* shape = futhark_shape_i64_2d(context, fut_intervals);
+    int64_t n_intervals = shape[0];
+    int64_t* intervals = malloc(n_intervals * 3 * sizeof(int64_t));
+
+    futhark_values_i64_2d(context, fut_intervals, intervals);
+    write_intervals(intervals, n_intervals, output_file);
+
+    futhark_free_i64_2d(context, fut_intervals);
+    free(intervals);
+
   } else {
-    futhark_entry_state_lows(context, &fut_reduced_lows, fut_state_in);
+    // Write the lows to file.
+    int64_t* reduced_lows = malloc(n * sizeof(int64_t));
     futhark_context_sync(context);
     futhark_values_i64_1d(context, fut_reduced_lows, reduced_lows);
     futhark_free_i64_1d(context, fut_reduced_lows);
+
+    printf("Writing lows to file\n");
+    write_array(reduced_lows, n, output_file);
+    free(reduced_lows);
   }
 
   printf("Freeing futhark data\n");
   futhark_free_opaque_state(context, fut_state_in);
-  /*futhark_free_opaque_state(context, fut_state_out);*/
   futhark_free_i32_1d(context, fut_col_idxs);
   futhark_free_i32_1d(context, fut_row_idxs);
-
-  /*char* context_report = futhark_context_report(context);*/
-  /*printf("\nContext report:\n%s\n", context_report);*/
-  /*free(context_report);*/
 
   printf("Freeing futhark context and config\n");
   futhark_context_free(context);
   futhark_context_config_free(config);
-
-
-  *out_nnz = reduced_nnz;
-  *out_col_idxs = reduced_col_idxs;
-  *out_row_idxs = reduced_row_idxs;
-  *out_lows = reduced_lows;
 
   return 0;
 }
@@ -181,10 +181,11 @@ int main(int argc, char *argv[]) {
   char* input_file;
   char* output_file;
   bool should_write_matrix = false;
+  bool should_write_intervals = false;
   bool debug = false;
 
   char c;
-  while( (c = getopt(argc, argv, "i:o:md")) != -1 ) {
+  while( (c = getopt(argc, argv, "i:o:mdp")) != -1 ) {
     switch(c) {
       case 'i':
         input_file = optarg;
@@ -194,6 +195,9 @@ int main(int argc, char *argv[]) {
         break;
       case 'm':
         should_write_matrix = true;
+        break;
+      case 'p':
+        should_write_intervals = true;
         break;
       case 'd':
         debug = true;
@@ -235,13 +239,8 @@ int main(int argc, char *argv[]) {
 
   timespec_get(&start_time, TIME_UTC);
 
-  int64_t reduced_nnz;
-  int32_t* reduced_col_idxs;
-  int32_t* reduced_row_idxs;
-  int64_t* reduced_lows;
-
-  int e = reduce(col_idxs, row_idxs, n, nnz, should_write_matrix, debug,
-      &reduced_col_idxs, &reduced_row_idxs, &reduced_lows, &reduced_nnz);
+  int e = reduce(col_idxs, row_idxs, n, nnz, should_write_matrix,
+      should_write_intervals, debug, output_file);
 
   timespec_get(&end_time, TIME_UTC);
   time_elapsed_s = difftime(end_time.tv_sec, start_time.tv_sec);
@@ -257,26 +256,6 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  if (should_write_matrix) {
-    int32_t* reduced_dense_matrix =
-      sparse_to_dense(reduced_col_idxs, reduced_row_idxs, reduced_nnz, n);
-
-    /*printf("Reduced matrix is:\n");*/
-    /*print_matrix(reduced_dense_matrix, n);*/
-    printf("Writing matrix to file\n");
-    write_dense_matrix(reduced_dense_matrix, n, output_file);
-    
-    free(reduced_dense_matrix);
-    free(reduced_col_idxs);
-    free(reduced_row_idxs);
-
-  } else {
-    /*printf("Reduced lows are:\n");*/
-    /*print_array(reduced_lows, n);*/
-    printf("Writing lows to file\n");
-    write_array(reduced_lows, n, output_file);
-    free(reduced_lows);
-  }
   printf("Done\n");
 }
 

@@ -57,7 +57,6 @@ let init_new_matrix (d: csc_mat) (left_right_pairs: [](i64, i64)): csc_mat =
      , row_idxs    = new_row_idxs
      }
 
--- TODO we can avoid the copy in scatter by moving this into init_new_matrix
 let copy_columns (js: []i64) (d1: csc_mat) (d2: csc_mat): csc_mat =
   let (is, as) =
     expand (\j -> d1.col_lengths[j])
