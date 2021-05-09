@@ -1,3 +1,4 @@
+#!/usr/bin/env julia
 using Nemo
 using DelimitedFiles
 using Printf

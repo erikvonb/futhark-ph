@@ -126,10 +126,10 @@ let add_pairs [n0] (left_right_pairs: [n0](i64, i64)) (d1: csc_mat) (d2: csc_mat
     in (row_idxs', pxs', pys', pzs')
 
   -- Set the final column lengths of the merged columns.
-  let new_col_lengths =
+  let col_lengths =
     scatter (copy d2.col_lengths) (update_idxs :> [n0]i64) pzs_final
 
-  in d2 with col_lengths = new_col_lengths
+  in d2 with col_lengths = col_lengths
         with row_idxs    = row_idxs
 
 let reduce_step [n] (d: csc_mat) (lows: [n]i64) (arglows: [n]i64) (nonzero_js: []i64): csc_mat =

@@ -7,7 +7,6 @@ let debug_ne: debug_t = (0, 0)
 
 type~ state [n] =
   { matrix: csc_mat
-  -- , const_matrix: const_mat
   , lows: [n]i64
   , arglows: [n]i64
   , nonzero_js: []i64
@@ -36,10 +35,10 @@ let add_columns [n] (s: state[n]): state[n] =
   in s with matrix = new_matrix
        with lows   = new_lows
 
-entry is_reduced [n] (s: state[n]): bool =
+let is_reduced [n] (s: state[n]): bool =
   all (\j -> s.lows[j] == -1 || s.arglows[s.lows[j]] == j) (iota n)
 
-entry iterate_step [n] (s: state[n]): state[n] =
+let iterate_step [n] (s: state[n]): state[n] =
   s |> clear |> update_lookup |> add_columns
 
 entry init_state (col_idxs: []i32) (row_idxs: []i32) (n: i64): state[n] =
@@ -54,6 +53,13 @@ entry init_state (col_idxs: []i32) (row_idxs: []i32) (n: i64): state[n] =
 entry reduce_state [n] (s: state[n]): state[n] =
   loop s while !(is_reduced s) do
     iterate_step s
+
+-- For benchmarking the algorithm directly with futhark-bench.
+-- ==
+-- input @ bench_input.txt
+let main (col_idxs: []i32) (row_idxs: []i32) (n: i64): []i64 =
+  let s = init_state col_idxs row_idxs n |> reduce_state
+  in s.lows
 
 -- Takes the column indices of all nonzeroes in the original, non-reduced,
 -- matrix as the first input, in order to compute the dimension of each simplex
