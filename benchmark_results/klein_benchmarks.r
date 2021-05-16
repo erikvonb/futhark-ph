@@ -1,8 +1,4 @@
-library(ggplot2)
-
 n_cols <- c(
-  32862, # 1.2
-  65606, # 1.3
   117395, # 1.4
   226809, # 1.5
   360293, # 1.6
@@ -14,8 +10,6 @@ n_cols <- c(
 )
 
 futhark_times = c(
-  mean(c(45542, 58316, 44991, 44406, 44451, 45807, 42865, 43089, 43328,46083)), # 1.2
-  mean(c(155430, 153501, 154105, 153837, 154103, 154051, 151892, 148116, 152305, 150685)), # 1.3
   mean(c(211963, 210972, 213256, 211591, 213989, 215314, 213793, 212276, 211773, 214113)), # 1.4
   mean(c(338813, 345375, 328189, 327151, 327591, 323204, 330319, 325026, 326640, 326173)), # 1.5
   mean(c(387203, 388373, 388595, 386315, 385190, 382877, 385508, 378810, 388302, 388682)), # 1.6
@@ -24,11 +18,9 @@ futhark_times = c(
   mean(c(1210513, 1224757, 1228842, 1219715, 1225265, 1224602, 1229716, 1226436, 1226602, 1222673)), # 1.9
   mean(c(1611741, 1612459, 1613291, 1608443, 1606789, 1608103, 1608684, 1611366, 1609886, 1610277)), # 2.0
   mean(c(2167022, 2168810, 2167049, 2158249, 2165627, 2165372, 2158783, 2165402, 2166130, 2162577)) # 2.1
-)
+) / 1e6
 
 openph_times = c(
-  0.087454, # 1.2, 10
-  0.20984, # 1.3, 20
   0.40965, # 1.4, 20
   0.79639, # 1.5, 30
   1.1231, # 1.6, 30
@@ -39,21 +31,8 @@ openph_times = c(
   7.5334 # 2.1, 30
 )
 
-n <- length(n_cols)
-df <- data.frame(
-  x = rep(n_cols / 1e3, 2),
-  y = c(futhark_times / 1e6, openph_times),
-  alg = c(rep("Ours", n), rep("OpenPH", n))
-)
+make_plot(n_cols, futhark_times, openph_times, "klein")
 
-ggplot(data = df, aes(x = x, y = y, group = alg)) +
-  geom_line(aes(linetype = alg)) +
-  geom_point() +
-  theme_bw() +
-  theme(legend.position = c(0.15, 0.85), text = element_text(size=14)) +
-  xlab("Number of thousand columns") +
-  ylab("Average runtime in seconds") +
-  ggtitle("Runtimes on VR complexes of a klein bottle") +
-  labs(linetype = "Algorithm")
-
-
+pdf(file = "benchmarks_klein.pdf", width = 6, height = 4)
+make_plot(n_cols, futhark_times, openph_times, "klein")
+dev.off()

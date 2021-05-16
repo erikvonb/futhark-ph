@@ -1,0 +1,246 @@
+{
+   "benchmark.fut" : {
+      "datasets" : {
+         "bench_hiv_diam_610_nnz_1125858.txt" : {
+            "bytes" : {
+               "device" : 67551480
+            },
+            "runtimes" : [
+               62479,
+               63960,
+               60120,
+               59830,
+               59214,
+               58410,
+               58029,
+               58185,
+               57995,
+               57756
+            ],
+            "stderr" : "runtime: 62479
+
+runtime: 63960
+
+runtime: 60120
+
+runtime: 59830
+
+runtime: 59214
+
+runtime: 58410
+
+runtime: 58029
+
+runtime: 58185
+
+runtime: 57995
+
+runtime: 57756
+
+Peak memory usage for space 'device': 67551480 bytes.
+
+"
+         },
+         "bench_hiv_diam_620_nnz_3093679.txt" : {
+            "bytes" : {
+               "device" : 185620740
+            },
+            "runtimes" : [
+               145168,
+               142731,
+               140723,
+               140198,
+               140641,
+               141140,
+               140929,
+               140963,
+               140942,
+               140302
+            ],
+            "stderr" : "runtime: 145168
+
+runtime: 142731
+
+runtime: 140723
+
+runtime: 140198
+
+runtime: 140641
+
+runtime: 141140
+
+runtime: 140929
+
+runtime: 140963
+
+runtime: 140942
+
+runtime: 140302
+
+Peak memory usage for space 'device': 185620740 bytes.
+
+"
+         },
+         "bench_hiv_diam_623_nnz_4339360.txt" : {
+            "bytes" : {
+               "device" : 260361600
+            },
+            "runtimes" : [
+               188517,
+               188730,
+               189013,
+               188806,
+               187481,
+               189030,
+               189072,
+               188469,
+               188332,
+               186905
+            ],
+            "stderr" : "runtime: 188517
+
+runtime: 188730
+
+runtime: 189013
+
+runtime: 188806
+
+runtime: 187481
+
+runtime: 189030
+
+runtime: 189072
+
+runtime: 188469
+
+runtime: 188332
+
+runtime: 186905
+
+Peak memory usage for space 'device': 260361600 bytes.
+
+"
+         },
+         "bench_hiv_diam_625_nnz_6527447.txt" : {
+            "bytes" : {
+               "device" : 391646820
+            },
+            "runtimes" : [
+               277169,
+               277588,
+               277550,
+               277630,
+               277135,
+               278097,
+               276025,
+               277850,
+               277649,
+               277775
+            ],
+            "stderr" : "runtime: 277169
+
+runtime: 277588
+
+runtime: 277550
+
+runtime: 277630
+
+runtime: 277135
+
+runtime: 278097
+
+runtime: 276025
+
+runtime: 277850
+
+runtime: 277649
+
+runtime: 277775
+
+Peak memory usage for space 'device': 391646820 bytes.
+
+"
+         },
+         "bench_hiv_diam_626_nnz_10429952.txt" : {
+            "bytes" : {
+               "device" : 625797120
+            },
+            "runtimes" : [
+               437752,
+               438435,
+               437016,
+               436750,
+               436111,
+               435869,
+               436911,
+               437419,
+               438064,
+               437051
+            ],
+            "stderr" : "runtime: 437752
+
+runtime: 438435
+
+runtime: 437016
+
+runtime: 436750
+
+runtime: 436111
+
+runtime: 435869
+
+runtime: 436911
+
+runtime: 437419
+
+runtime: 438064
+
+runtime: 437051
+
+Peak memory usage for space 'device': 625797120 bytes.
+
+"
+         },
+         "bench_hiv_diam_627_nnz_12522741.txt" : {
+            "bytes" : {
+               "device" : 751364460
+            },
+            "runtimes" : [
+               512691,
+               513634,
+               513541,
+               513223,
+               513146,
+               513211,
+               512516,
+               512976,
+               513230,
+               518562
+            ],
+            "stderr" : "runtime: 512691
+
+runtime: 513634
+
+runtime: 513541
+
+runtime: 513223
+
+runtime: 513146
+
+runtime: 513211
+
+runtime: 512516
+
+runtime: 512976
+
+runtime: 513230
+
+runtime: 518562
+
+Peak memory usage for space 'device': 751364460 bytes.
+
+"
+         }
+      }
+   }
+}
