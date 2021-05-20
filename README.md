@@ -22,5 +22,5 @@ Run `./cref_test.jl test-matrices-sparse/*` to check correctness on 50 specific 
 ## Benchmarking
 The Julia script `benchmark.jl` reads list of COO matrices from a file, converts them into Futhark syntax, and runs `futhark bench` on them.
 The benchmark times are printed to stdout and saved to `bench.json`.
-Run `./benchmark.jl benchmark-matrices/*` to benchmark on 7 matrices with about 10^6 columns each.
+Run `./benchmark.jl benchmark-matrices/*` to benchmark on 3 matrices with about 150k-250k columns each.
 
