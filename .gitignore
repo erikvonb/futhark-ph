@@ -2,9 +2,11 @@ reduction.c
 reduction.h
 reduction
 main
+benchmark
 
 futhark.pkg
 lib/
 
 benchmark-results/
+log
 
