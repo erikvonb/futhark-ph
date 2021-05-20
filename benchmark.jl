@@ -67,7 +67,6 @@ function main()
   map(rm, filenames_out)
   rm("benchmark.fut")
   rm("benchmark.c")
-  rm("benchmark")
   rm("bench0.json")
 
 end

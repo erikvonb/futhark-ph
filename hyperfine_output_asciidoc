@@ -1,8 +1,0 @@
-[cols="<,>,>"]
-|===
-| Command | Mean [ms] | Min…Max [ms]
-
-| `./main -o tmplows -i ../datasets/sparse/klein_bottle_pointcloud_new_400_diam_1.3_nnz_234356.txt `
-| 356.4 ± 23.2
-| 329.9…399.9
-|===

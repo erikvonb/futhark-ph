@@ -54,12 +54,27 @@ entry reduce_state [n] (s: state[n]): state[n] =
   loop s while !(is_reduced s) do
     iterate_step s
 
+entry reduce_state_early_stopping [n] (iters: i32) (s: state[n]): state[n] =
+  -- loop s for _ in 1...iters do
+  loop s for i < iters do
+    iterate_step s
+
 -- For benchmarking the algorithm directly with futhark-bench.
 -- ==
 -- input @ bench_input.txt
 let main (col_idxs: []i32) (row_idxs: []i32) (n: i64): []i64 =
-  let s = init_state col_idxs row_idxs n |> reduce_state
+  let s = init_state col_idxs row_idxs n
+          |> reduce_state
   in s.lows
+
+-- entry early_stopping (col_idxs: []i32)
+                     -- (row_idxs: []i32)
+                     -- (n: i64)
+                     -- (iters: i32)
+                   -- : []i64 =
+  -- let s = init_state col_idxs row_idxs n
+          -- |> reduce_state_early_stopping iters
+  -- in s.lows
 
 -- Takes the column indices of all nonzeroes in the original, non-reduced,
 -- matrix as the first input, in order to compute the dimension of each simplex

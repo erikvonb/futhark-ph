@@ -58,7 +58,7 @@ bool handle_error(struct futhark_context *ctx, int e, char* entry_name) {
 int reduce(
     int32_t* col_idxs, int32_t* row_idxs, int64_t n, int nnz,
     bool should_write_matrix, bool should_write_intervals, bool debug,
-    char* output_file) {
+    char* output_file, int32_t n_iterations) {
 
   struct futhark_context_config* config = futhark_context_config_new();
   if (debug) {
@@ -89,14 +89,16 @@ int reduce(
   if (handle_error(context, err, "init_state")) {
     return 1;
   }
-
-  bool converged = false;
-  int n_iterations = 0;
   
-  futhark_entry_reduce_state(context, &fut_state_out, fut_state_in);
+  if (n_iterations >= 0) {
+    futhark_entry_reduce_state_early_stopping(context, &fut_state_out,
+        n_iterations, fut_state_in);
+  } else {
+    futhark_entry_reduce_state(context, &fut_state_out, fut_state_in);
+  }
   fut_state_in = fut_state_out;
 
-  printf("Finished reducing after %d iterations\n", n_iterations);
+  printf("Finished reducing\n");
   futhark_context_sync(context);
   
   int64_t reduced_nnz;
@@ -183,9 +185,10 @@ int main(int argc, char *argv[]) {
   bool should_write_matrix = false;
   bool should_write_intervals = false;
   bool debug = false;
+  int32_t n_iterations = -1;
 
   char c;
-  while( (c = getopt(argc, argv, "i:o:mdp")) != -1 ) {
+  while( (c = getopt(argc, argv, "i:o:mdpn:")) != -1 ) {
     switch(c) {
       case 'i':
         input_file = optarg;
@@ -201,6 +204,9 @@ int main(int argc, char *argv[]) {
         break;
       case 'd':
         debug = true;
+        break;
+      case 'n':
+        n_iterations = atoi(optarg);
         break;
     }
   }
@@ -240,7 +246,7 @@ int main(int argc, char *argv[]) {
   timespec_get(&start_time, TIME_UTC);
 
   int e = reduce(col_idxs, row_idxs, n, nnz, should_write_matrix,
-      should_write_intervals, debug, output_file);
+      should_write_intervals, debug, output_file, n_iterations);
 
   timespec_get(&end_time, TIME_UTC);
   time_elapsed_s = difftime(end_time.tv_sec, start_time.tv_sec);

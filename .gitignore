@@ -1,14 +1,10 @@
 reduction.c
 reduction.h
+reduction
 main
 
 futhark.pkg
 lib/
 
-notes.txt
-benchmark-notes.txt
-output_lows/
-tmp
-.Rhistory
-
+benchmark-results/
 
