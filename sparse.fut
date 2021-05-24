@@ -10,9 +10,6 @@ type~ csc_mat =
 -- (j, i); column index, row index
 type coo2_mat [n] = [n](i32, i32)
 
-let csc_col_nnz (d: csc_mat) (j: i64): i64 =
-  d.col_lengths[j]
-
 let sort_coo2 [n] (d: coo2_mat[n]): coo2_mat[n] =
   radix_sort
     64
@@ -20,7 +17,7 @@ let sort_coo2 [n] (d: coo2_mat[n]): coo2_mat[n] =
     d
 
 let low (d: csc_mat) (j: i64): i64 =
-  if csc_col_nnz d j == 0
+  if d.col_lengths[j] == 0
     then -1
     else i64.i32 d.row_idxs[ d.col_offsets[j] + d.col_lengths[j] - 1 ]
   
